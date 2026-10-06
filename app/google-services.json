@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "786754619922",
+    "project_id": "soundengitoolkit-f2e9c1a0",
+    "storage_bucket": "soundengitoolkit-f2e9c1a0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:786754619922:android:266c33b31a22501a2066cb",
+        "android_client_info": {
+          "package_name": "com.example.soundengitoolkit"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAkopuTaBchznnnkyjOnDkZkWlDbupU1H8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
