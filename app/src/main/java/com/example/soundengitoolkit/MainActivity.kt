@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.compose.ui.Modifier
@@ -71,6 +72,9 @@ fun Screen(e: Engine) {
     val vs = remember { ViewState() }                       // cursor and loop markers, kept in sync by ScopePanel
     var restore by remember { mutableStateOf<ViewState?>(null) }
     var showSave by remember { mutableStateOf(false) }
+    var tab by rememberSaveable { mutableIntStateOf(0) }    // 0 = Studio, 1 = Library
+    val studioScroll = rememberScrollState()
+    val libraryScroll = rememberScrollState()
 
     fun begin() {
         val ok = e.startRecording { n -> status = "Recorded %.1f s".format(n / SR) }
@@ -88,107 +92,121 @@ fun Screen(e: Engine) {
         fxState["Delay"] = e.delay.on; fxState["Reverb"] = e.reverb.on; bpm = e.bpm
     }
 
-    Column(Modifier.fillMaxSize().background(Color(0xFF111111)).safeDrawingPadding()
-        .verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("SoundEngiToolkit", style = MaterialTheme.typography.titleLarge)
-
-        // Master volume: really changes what you hear (unlike the oscilloscope view gain)
-        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(if (vol <= -60f) "Volume: mute" else "Volume %+.0f dB".format(vol),
-                Modifier.width(130.dp), style = MaterialTheme.typography.bodySmall)
-            Slider(vol, { vol = it; e.masterDb = it }, Modifier.weight(1f), valueRange = -60f..12f)
+    Column(Modifier.fillMaxSize().background(Color(0xFF111111)).safeDrawingPadding()) {
+        Text("SoundEngiToolkit", Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 8.dp),
+            style = MaterialTheme.typography.titleLarge)
+        TabRow(selectedTabIndex = tab) {
+            Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Studio") })
+            Tab(selected = tab == 1,
+                onClick = { if (rec) status = "Stop recording first" else tab = 1 },
+                text = { Text("Library (${projects.size})") })
         }
 
-        // Sampler
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = {
-                if (rec) { e.stopRecording(); rec = false; status = "Processing..." }
-                else if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO)
-                    == PackageManager.PERMISSION_GRANTED) begin()
-                else perm.launch(Manifest.permission.RECORD_AUDIO)
-            }) { Text(if (rec) "■ Stop" else "● Record") }
-            Button(onClick = {
-                when {
-                    rec -> status = "Stop recording first"
-                    e.sampler.data.isEmpty() -> status = "Nothing to save: record something first"
-                    else -> showSave = true
+        Column(Modifier.weight(1f).verticalScroll(if (tab == 0) studioScroll else libraryScroll).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (tab == 0) {
+                // Master volume: really changes what you hear (unlike the oscilloscope view gain)
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(if (vol <= -60f) "Volume: mute" else "Volume %+.0f dB".format(vol),
+                        Modifier.width(130.dp), style = MaterialTheme.typography.bodySmall)
+                    Slider(vol, { vol = it; e.masterDb = it }, Modifier.weight(1f), valueRange = -60f..12f)
                 }
-            }) { Text("Save") }
+
+                // Sampler
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = {
+                        if (rec) { e.stopRecording(); rec = false; status = "Processing..." }
+                        else if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO)
+                            == PackageManager.PERMISSION_GRANTED) begin()
+                        else perm.launch(Manifest.permission.RECORD_AUDIO)
+                    }) { Text(if (rec) "■ Stop" else "● Record") }
+                    Button(onClick = {
+                        when {
+                            rec -> status = "Stop recording first"
+                            e.sampler.data.isEmpty() -> status = "Nothing to save: record something first"
+                            else -> showSave = true
+                        }
+                    }) { Text("Save") }
+                }
+                ScopePanel(e, bpm, vs, restore) { restore = null }
+                if (status.isNotEmpty()) Text(status, style = MaterialTheme.typography.bodySmall)
+
+                if (showSave) SaveDialog(
+                    defaultName = defaultProjectName(),
+                    onSave = { name ->
+                        showSave = false
+                        scope.launch {
+                            status = try { "Saved: ${store.save(e, name, vs).name}" }
+                            catch (ex: Exception) { "Save failed: ${ex.message}" }
+                        }
+                    },
+                    onDismiss = { showSave = false }
+                )
+
+                // Synth keys C4..C5
+                Row(Modifier.fillMaxWidth().height(90.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                    listOf(60, 62, 64, 65, 67, 69, 71, 72).forEach { note ->
+                        Box(Modifier.weight(1f).fillMaxHeight().background(Color(0xFFEEEEEE))
+                            .pointerInput(note) {
+                                detectTapGestures(onPress = { e.synth.on(note); tryAwaitRelease(); e.synth.off(note) })
+                            })
+                    }
+                }
+
+                // Effects
+                Text("BPM ${bpm.toInt()}")
+                Slider(bpm, { bpm = it; e.bpm = it }, valueRange = 60f..200f)
+                fxState.keys.toList().forEach { name ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(name)
+                        Switch(fxState[name] == true, { v ->
+                            fxState[name] = v
+                            when (name) { "EQ" -> e.eq.on = v; "Compressor" -> e.comp.on = v
+                                "Delay" -> e.delay.on = v; else -> e.reverb.on = v }
+                        })
+                    }
+                }
+
+                // AI
+                OutlinedTextField(prompt, { prompt = it }, Modifier.fillMaxWidth(), label = { Text("AI command") })
+                Button(onClick = {
+                    scope.launch {
+                        var json = ""
+                        val result = try {
+                            withContext(Dispatchers.IO) { json = Ai.ask(prompt); Ai.apply(e, json) } to true
+                        } catch (ex: Throwable) { "Error: ${ex.javaClass.simpleName}: ${ex.message}" to false }
+                        log = result.first.ifBlank { "No actions recognized" }
+                        sync()
+                        runCatching { store.logAi(prompt, json, result.first, Ai.lastSource(), result.second && result.first.isNotBlank()) }
+                    }
+                }) { Text("Run") }
+                Text(log, style = MaterialTheme.typography.bodySmall)
+                HistoryPanel(history, onPick = { prompt = it }, onClear = { scope.launch { runCatching { store.clearHistory() } } })
+            } else {
+                if (status.isNotEmpty()) Text(status, style = MaterialTheme.typography.bodySmall)
+                ProjectsPanel(
+                    projects,
+                    onLoad = { p ->
+                        if (rec) status = "Stop recording first"
+                        else scope.launch {
+                            status = try {
+                                restore = ViewState(p.cursorPos, p.loopA, p.loopB, p.loopOn)   // before the data changes
+                                store.load(p, e); sync()
+                                tab = 0                                                          // show the loaded recording
+                                "Loaded: ${p.name}"
+                            } catch (ex: Exception) { restore = null; "Load failed: ${ex.message}" }
+                        }
+                    },
+                    onDelete = { p ->
+                        scope.launch {
+                            status = try { store.delete(p); "Deleted: ${p.name}" }
+                            catch (ex: Exception) { "Delete failed: ${ex.message}" }
+                        }
+                    }
+                )
+            }
         }
-        ScopePanel(e, bpm, vs, restore) { restore = null }
-        if (status.isNotEmpty()) Text(status, style = MaterialTheme.typography.bodySmall)
-
-        if (showSave) SaveDialog(
-            defaultName = defaultProjectName(),
-            onSave = { name ->
-                showSave = false
-                scope.launch {
-                    status = try { "Saved: ${store.save(e, name, vs).name}" }
-                    catch (ex: Exception) { "Save failed: ${ex.message}" }
-                }
-            },
-            onDismiss = { showSave = false }
-        )
-        ProjectsPanel(
-            projects,
-            onLoad = { p ->
-                if (rec) status = "Stop recording first"
-                else scope.launch {
-                    status = try {
-                        restore = ViewState(p.cursorPos, p.loopA, p.loopB, p.loopOn)   // before the data changes
-                        store.load(p, e); sync(); "Loaded: ${p.name}"
-                    } catch (ex: Exception) { restore = null; "Load failed: ${ex.message}" }
-                }
-            },
-            onDelete = { p ->
-                scope.launch {
-                    status = try { store.delete(p); "Deleted: ${p.name}" }
-                    catch (ex: Exception) { "Delete failed: ${ex.message}" }
-                }
-            }
-        )
-
-        // Synth keys C4..C5 + sample pitched on long-press-free row
-        Row(Modifier.fillMaxWidth().height(90.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-            listOf(60, 62, 64, 65, 67, 69, 71, 72).forEach { note ->
-                Box(Modifier.weight(1f).fillMaxHeight().background(Color(0xFFEEEEEE))
-                    .pointerInput(note) {
-                        detectTapGestures(onPress = { e.synth.on(note); tryAwaitRelease(); e.synth.off(note) })
-                    })
-            }
-        }
-
-        // Effects
-        Text("BPM ${bpm.toInt()}")
-        Slider(bpm, { bpm = it; e.bpm = it }, valueRange = 60f..200f)
-        fxState.keys.toList().forEach { name ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(name)
-                Switch(fxState[name] == true, { v ->
-                    fxState[name] = v
-                    when (name) { "EQ" -> e.eq.on = v; "Compressor" -> e.comp.on = v
-                        "Delay" -> e.delay.on = v; else -> e.reverb.on = v }
-                })
-            }
-        }
-
-        // AI
-        OutlinedTextField(prompt, { prompt = it }, Modifier.fillMaxWidth(), label = { Text("AI command") })
-        Button(onClick = {
-            scope.launch {
-                var json = ""
-                val result = try {
-                    withContext(Dispatchers.IO) { json = Ai.ask(prompt); Ai.apply(e, json) } to true
-                } catch (ex: Throwable) { "Error: ${ex.javaClass.simpleName}: ${ex.message}" to false }
-                log = result.first.ifBlank { "No actions recognized" }
-                sync()
-                runCatching { store.logAi(prompt, json, result.first, Ai.lastSource(), result.second && result.first.isNotBlank()) }
-            }
-        }) { Text("Run") }
-        Text(log, style = MaterialTheme.typography.bodySmall)
-        HistoryPanel(history, onPick = { prompt = it }, onClear = { scope.launch { runCatching { store.clearHistory() } } })
     }
 }
 
@@ -225,10 +243,15 @@ fun ScopePanel(e: Engine, bpm: Float, vs: ViewState, restore: ViewState?, onRest
     var liveMs by remember { mutableFloatStateOf(25f) }
     var wPx by remember { mutableIntStateOf(0) }
     var tick by remember { mutableIntStateOf(0) }
-    var cursor by remember { mutableIntStateOf(0) }
-    var loopA by remember { mutableIntStateOf(0) }
-    var loopB by remember { mutableIntStateOf(e.sampler.data.size) }
-    var loopOn by remember { mutableStateOf(false) }
+    val d0 = e.sampler.data
+    // Panel may be re-created (tab switch): continue from the saved state, or from a just-loaded project.
+    val seed = remember { restore ?: vs.takeIf { it.owner === d0 } }
+    var cursor by remember { mutableIntStateOf((seed?.cursor ?: 0).coerceIn(0, max(0, d0.size - 1))) }
+    var loopA by remember { mutableIntStateOf((seed?.loopA ?: 0).coerceIn(0, d0.size)) }
+    var loopB by remember {
+        mutableIntStateOf(seed?.loopB?.takeIf { it > loopA }?.coerceAtMost(d0.size) ?: d0.size)
+    }
+    var loopOn by remember { mutableStateOf(seed?.loopOn ?: false) }
     var snap by remember { mutableStateOf(false) }
     var playPos by remember { mutableIntStateOf(-1) }
     val pts = remember { FloatArray(1024) }
@@ -263,8 +286,9 @@ fun ScopePanel(e: Engine, bpm: Float, vs: ViewState, restore: ViewState?, onRest
             }
         }
     }
-    LaunchedEffect(cursor, loopA, loopB, loopOn) {            // expose current state for "Save"
-        vs.cursor = cursor; vs.loopA = loopA; vs.loopB = loopB; vs.loopOn = loopOn
+    LaunchedEffect(Unit) { if (restoreU.value != null) onRestored() }   // restore was consumed by `seed`
+    LaunchedEffect(cursor, loopA, loopB, loopOn, data) {      // expose current state for "Save" and tab switches
+        vs.cursor = cursor; vs.loopA = loopA; vs.loopB = loopB; vs.loopOn = loopOn; vs.owner = data
     }
     LaunchedEffect(loopA, loopB, loopOn) {
         e.sampler.loopStart = loopA; e.sampler.loopEnd = loopB; e.sampler.loopOn = loopOn

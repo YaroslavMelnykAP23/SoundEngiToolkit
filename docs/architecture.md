@@ -47,7 +47,7 @@ flowchart TB
 
 | Компонент | Файл | Роль |
 |---|---|---|
-| UI | `MainActivity.kt` | `Screen` (головний екран), `ScopePanel` (осцилограф, курсор, loop, сітка) |
+| UI | `MainActivity.kt` | `Screen` (головний екран з вкладками Studio / Library), `ScopePanel` (осцилограф, курсор, loop, сітка) |
 | Рушій | `Engine.kt` | аудіопотоки, запис, ланцюжок ефектів, master volume, кільцевий буфер осцилографа |
 | DSP | `Dsp.kt` | `Synth`, `Sampler`, `Eq`, `Comp`, `Delay`, `Reverb` |
 | AI-шар | `Ai.kt` | схема JSON-дій (`Ai.SYSTEM`), виконання дій (`Ai.apply`) |
@@ -58,7 +58,7 @@ flowchart TB
 | UI збереження | `LibraryUi.kt` | `SaveDialog`, `ProjectsPanel`, `HistoryPanel` |
 
 Backend: окремого сервера немає. Хмарні функції заплановані через Firebase (див. [decisions.md](decisions.md)).
-
+Інтерфейс має дві вкладки (`TabRow`): **Studio** (запис, осцилограф, клавіші, ефекти, AI-команди, кнопка Save) і **Library** (список збережених записів з Load і Delete). Після Load додаток повертається на Studio. Під час запису перехід на Library заблоковано.
 ## Потоки виконання
 
 1. **UI-потік (Compose)** малює екран і обробляє дотики.

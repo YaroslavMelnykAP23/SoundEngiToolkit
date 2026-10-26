@@ -8,7 +8,10 @@ import java.io.File
 import java.util.UUID
 
 /** Cursor, loop markers and loop switch of the oscilloscope (in samples). */
-class ViewState(var cursor: Int = 0, var loopA: Int = 0, var loopB: Int = 0, var loopOn: Boolean = false)
+class ViewState(var cursor: Int = 0, var loopA: Int = 0, var loopB: Int = 0, var loopOn: Boolean = false) {
+    /** The recording these values belong to (compared by identity). */
+    var owner: FloatArray? = null
+}
 
 /** Effect settings <-> JSON. Same keys as the AI actions (see docs/api-contract.md). */
 object FxState {
