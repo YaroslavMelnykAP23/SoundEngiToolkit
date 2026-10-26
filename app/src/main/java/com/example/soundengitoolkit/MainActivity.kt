@@ -65,6 +65,12 @@ fun Screen(e: Engine) {
     var status by remember { mutableStateOf("") }
     var vol by remember { mutableFloatStateOf(0f) }
     val ctx = LocalContext.current
+    val store = remember { ProjectStore(ctx) }
+    val projects by store.projects.collectAsState(initial = emptyList())
+    val history by store.history.collectAsState(initial = emptyList())
+    val vs = remember { ViewState() }                       // cursor and loop markers, kept in sync by ScopePanel
+    var restore by remember { mutableStateOf<ViewState?>(null) }
+    var showSave by remember { mutableStateOf(false) }
 
     fun begin() {
         val ok = e.startRecording { n -> status = "Recorded %.1f s".format(n / SR) }
@@ -98,14 +104,51 @@ fun Screen(e: Engine) {
         // Sampler
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = {
-                if (rec) { e.stopRecording(); rec = false; status = "Saving..." }
+                if (rec) { e.stopRecording(); rec = false; status = "Processing..." }
                 else if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO)
                     == PackageManager.PERMISSION_GRANTED) begin()
                 else perm.launch(Manifest.permission.RECORD_AUDIO)
             }) { Text(if (rec) "■ Stop" else "● Record") }
+            Button(onClick = {
+                when {
+                    rec -> status = "Stop recording first"
+                    e.sampler.data.isEmpty() -> status = "Nothing to save: record something first"
+                    else -> showSave = true
+                }
+            }) { Text("Save") }
         }
-        ScopePanel(e, bpm)
+        ScopePanel(e, bpm, vs, restore) { restore = null }
         if (status.isNotEmpty()) Text(status, style = MaterialTheme.typography.bodySmall)
+
+        if (showSave) SaveDialog(
+            defaultName = defaultProjectName(),
+            onSave = { name ->
+                showSave = false
+                scope.launch {
+                    status = try { "Saved: ${store.save(e, name, vs).name}" }
+                    catch (ex: Exception) { "Save failed: ${ex.message}" }
+                }
+            },
+            onDismiss = { showSave = false }
+        )
+        ProjectsPanel(
+            projects,
+            onLoad = { p ->
+                if (rec) status = "Stop recording first"
+                else scope.launch {
+                    status = try {
+                        restore = ViewState(p.cursorPos, p.loopA, p.loopB, p.loopOn)   // before the data changes
+                        store.load(p, e); sync(); "Loaded: ${p.name}"
+                    } catch (ex: Exception) { restore = null; "Load failed: ${ex.message}" }
+                }
+            },
+            onDelete = { p ->
+                scope.launch {
+                    status = try { store.delete(p); "Deleted: ${p.name}" }
+                    catch (ex: Exception) { "Delete failed: ${ex.message}" }
+                }
+            }
+        )
 
         // Synth keys C4..C5 + sample pitched on long-press-free row
         Row(Modifier.fillMaxWidth().height(90.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -135,13 +178,17 @@ fun Screen(e: Engine) {
         OutlinedTextField(prompt, { prompt = it }, Modifier.fillMaxWidth(), label = { Text("AI command") })
         Button(onClick = {
             scope.launch {
-                log = try {
-                    withContext(Dispatchers.IO) { Ai.apply(e, Ai.ask(prompt)) }
-                } catch (ex: Throwable) { "Error: ${ex.javaClass.simpleName}: ${ex.message}" }
+                var json = ""
+                val result = try {
+                    withContext(Dispatchers.IO) { json = Ai.ask(prompt); Ai.apply(e, json) } to true
+                } catch (ex: Throwable) { "Error: ${ex.javaClass.simpleName}: ${ex.message}" to false }
+                log = result.first.ifBlank { "No actions recognized" }
                 sync()
+                runCatching { store.logAi(prompt, json, result.first, Ai.lastSource(), result.second && result.first.isNotBlank()) }
             }
         }) { Text("Run") }
         Text(log, style = MaterialTheme.typography.bodySmall)
+        HistoryPanel(history, onPick = { prompt = it }, onClear = { scope.launch { runCatching { store.clearHistory() } } })
     }
 }
 
@@ -167,8 +214,9 @@ private fun columns(d: FloatArray, start: Float, len: Float, w: Int): Cols {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ScopePanel(e: Engine, bpm: Float) {
+fun ScopePanel(e: Engine, bpm: Float, vs: ViewState, restore: ViewState?, onRestored: () -> Unit) {
     val bpmU = rememberUpdatedState(bpm)
+    val restoreU = rememberUpdatedState(restore)
     var live by remember { mutableStateOf(false) }            // false = whole recording, true = live output
     var viewGainDb by remember { mutableFloatStateOf(0f) }    // display only, does not change the sound
     var data by remember { mutableStateOf(e.sampler.data) }
@@ -205,8 +253,18 @@ fun ScopePanel(e: Engine, bpm: Float) {
         while (true) {
             delay(100)
             val d = e.sampler.data
-            if (d !== data) { data = d; fit(); cursor = 0; loopA = 0; loopB = d.size }
+            if (d !== data) {
+                data = d; fit(); cursor = 0; loopA = 0; loopB = d.size; loopOn = false
+                restoreU.value?.let { r ->                    // a saved project was loaded: put markers back
+                    loopA = r.loopA.coerceIn(0, d.size); loopB = r.loopB.coerceIn(loopA, d.size)
+                    cursor = r.cursor.coerceIn(0, max(0, d.size - 1)); loopOn = r.loopOn
+                    onRestored()
+                }
+            }
         }
+    }
+    LaunchedEffect(cursor, loopA, loopB, loopOn) {            // expose current state for "Save"
+        vs.cursor = cursor; vs.loopA = loopA; vs.loopB = loopB; vs.loopOn = loopOn
     }
     LaunchedEffect(loopA, loopB, loopOn) {
         e.sampler.loopStart = loopA; e.sampler.loopEnd = loopB; e.sampler.loopOn = loopOn

@@ -56,9 +56,14 @@ class FirebaseSource(
 
 /** Rules first (free, offline). If nothing recognized, fall back to the cloud model. */
 class HybridSource(private val rules: CommandSource, private val cloud: CommandSource) : CommandSource {
+    @Volatile var lastUsed = "rules"
+
     override suspend fun ask(prompt: String): String {
         val r = rules.ask(prompt)
-        if (JSONObject(r).getJSONArray("actions").length() > 0) return r
-        return runCatching { cloud.ask(prompt) }.getOrDefault(r)
+        if (JSONObject(r).getJSONArray("actions").length() > 0) { lastUsed = "rules"; return r }
+        return runCatching { cloud.ask(prompt) }
+            .onSuccess { lastUsed = "cloud" }
+            .onFailure { lastUsed = "rules (cloud failed)" }
+            .getOrDefault(r)
     }
 }

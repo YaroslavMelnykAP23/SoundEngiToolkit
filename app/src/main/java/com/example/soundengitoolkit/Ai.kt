@@ -12,6 +12,9 @@ object Ai {
 
     suspend fun ask(prompt: String): String = source.ask(prompt)
 
+    /** Name of the source that answered the last command (for the history). */
+    fun lastSource(): String = (source as? HybridSource)?.lastUsed ?: source::class.simpleName ?: "unknown"
+
     const val SYSTEM = """You control an audio app. Reply with ONLY a JSON object, no prose, no markdown:
 {"actions":[...]}. Allowed actions:
 {"fx":"bpm","value":40-240}

@@ -26,8 +26,12 @@ Android-додаток (Kotlin, Jetpack Compose): семплер + синтез�
    <uses-permission android:name="android.permission.RECORD_AUDIO" />
    <uses-permission android:name="android.permission.INTERNET" />
    ```
-2. `app/build.gradle.kts`, залежності для хмарного AI (версії звіряти з документацією Firebase):
+2. `app/build.gradle.kts`: плагін KSP та Room (версію KSP підбирати під версію Kotlin проєкту), а також залежності для хмарного AI (версії Firebase звіряти з документацією):
    ```kotlin
+   plugins { id("com.google.devtools.ksp") version "<версія KSP>" }   // у файлі модуля app
+   implementation("androidx.room:room-runtime:2.8.4")
+   implementation("androidx.room:room-ktx:2.8.4")
+   ksp("androidx.room:room-compiler:2.8.4")
    implementation(platform("com.google.firebase:firebase-bom:<версія>"))
    implementation("com.google.firebase:firebase-ai")
    implementation("com.google.firebase:firebase-appcheck-debug")
@@ -41,7 +45,8 @@ Android-додаток (Kotlin, Jetpack Compose): семплер + синтез�
 |---|---|
 | Аудіо | mono, 44 100 Гц, `PCM_FLOAT`, блок 256 семплів |
 | Потоки | UI, `audio-out`, `audio-in`, корутина `Dispatchers.IO` для AI |
-| Файли коду | `MainActivity.kt`, `Engine.kt`, `Dsp.kt`, `Ai.kt`, `CommandSource.kt` |
+| Файли коду | `MainActivity.kt`, `LibraryUi.kt`, `Engine.kt`, `Dsp.kt`, `Ai.kt`, `CommandSource.kt`, `Store.kt`, `Db.kt`, `Wav.kt` |
+| Локальне сховище | Room (`soundengitoolkit.db`) + WAV у `filesDir/projects` |
 | Backend | немає; заплановано Firebase (Auth, Firestore, Storage) |
 | Автоматичні тести | немає |
 

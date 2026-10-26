@@ -21,16 +21,19 @@
 | R-13 | Пік і RMS у dBFS, лінійна вісь, View gain 0…40 дБ | Done | `Engine.levels`, `columns()` |
 | R-14 | AI-команди → JSON-дії → зміна параметрів | Done | `Ai.apply`, `CommandSource` |
 | R-15 | Правила як офлайн-fallback для AI | Done | `RulesSource`, `HybridSource` |
+| R-16 | Збереження запису кнопкою Save: WAV 16 біт stereo (L=R) у `filesDir/projects`, метадані (BPM, курсор, маркери, ефекти) у Room | Done | `ProjectStore.save`, `Wav`, `Db.kt` |
+| R-17 | Список збережених записів: завантаження з відновленням курсора, маркерів, ефектів і BPM; видалення з підтвердженням | Done | `ProjectStore.load/delete`, `ProjectsPanel` |
+| R-18 | Історія AI-команд (запит, JSON, журнал, джерело, час; до 200 записів), повторне використання запиту | Done | `ProjectStore.logAi`, `HistoryPanel` |
 
 ## Незавершені
 
 | ID | Вимога | Статус |
 |---|---|---|
 | R-20 | Слайдери параметрів EQ, компресора, delay, reverb в інтерфейсі | Planned |
-| R-21 | Локальна БД (Room): проєкти, семпли, пресети | Planned |
+| R-21 | Локальна БД (Room): пресети ефектів, перейменування й перезапис проєктів, міграції схеми | Planned (проєкти й історія AI вже зберігаються, див. R-16..R-18) |
 | R-22 | Firebase: Authentication, Firestore, Cloud Storage | Planned |
 | R-23 | Імпорт аудіофайлів, мікшування зі сторонніми звуками | Planned |
-| R-24 | Експорт обробленого результату у файл | Planned |
+| R-24 | Експорт обробленого результату (запис з ефектами) у файл, MediaStore чи системний діалог | Planned (етап 3) |
 | R-25 | Перенесення DSP на C++ (Oboe) для малої затримки | Planned |
 | R-26 | Автоматичні тести (unit + instrumented) | Planned |
 | R-27 | App Check і обмеження API-ключів | Planned |

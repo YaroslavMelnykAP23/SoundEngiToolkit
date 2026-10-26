@@ -49,8 +49,15 @@ class Bq {
 
 class Eq : Fx() {
     private val lo = Bq(); private val mid = Bq(); private val hi = Bq()
+    var lowDb = 0f
+        private set
+    var midDb = 0f
+        private set
+    var highDb = 0f
+        private set
     init { set(0f, 0f, 0f) }
     fun set(low: Float, m: Float, high: Float) {
+        lowDb = low; midDb = m; highDb = high
         lo.shelf(100f, low, false); mid.peak(1000f, m, 1f); hi.shelf(8000f, high, true)
     }
     override fun run(b: FloatArray, n: Int) { lo.run(b, n); mid.run(b, n); hi.run(b, n) }
@@ -103,7 +110,11 @@ class Reverb : Fx() {
 }
 
 class Comp : Fx() {
-    private var thr = -18f; private var ratio = 4f; private var makeup = 1f; private var env = 0f
+    var thr = -18f
+        private set
+    var ratio = 4f
+        private set
+    private var makeup = 1f; private var env = 0f
     private val att = exp(-1f / (0.01f * SR)); private val rel = exp(-1f / (0.15f * SR))
     init { set(-18f, 4f) }
 
