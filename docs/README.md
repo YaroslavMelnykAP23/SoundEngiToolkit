@@ -39,6 +39,16 @@ Android-додаток (Kotlin, Jetpack Compose): семплер + синтез�
 3. Для хмарного AI: `google-services.json` у `app/` і плагін `com.google.gms.google-services`. Файл **не комітити**. Без нього додаток працює, а AI обмежується правилами.
 4. Запуск: `./gradlew assembleDebug`, потім Run на реальному пристрої. Версії `minSdk`, `compileSdk`, Kotlin і Compose дивитися в `app/build.gradle.kts` (рішення про `minSdk` ще відкрите, див. [decisions.md](decisions.md)).
 
+# Лабораторна робота 5: оптимізація архітектури
+
+**Варіант:** А, Mobile Architecture (Android-клієнт без власного backend).
+
+**Сценарій:** «AI-команда». Користувач вводить текст у полі AI command і натискає Run;
+джерело команд повертає JSON-дії, які змінюють BPM та параметри ефектів.
+
+**Зовнішня залежність за інтерфейсом:** `CommandSource` (хмарне джерело: Gemini через
+Firebase AI Logic).
+
 ## Ключові факти
 
 | Параметр | Значення |
