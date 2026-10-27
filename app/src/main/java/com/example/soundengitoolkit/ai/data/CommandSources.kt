@@ -10,14 +10,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 import com.example.soundengitoolkit.ai.domain.AiError
 import com.example.soundengitoolkit.ai.domain.AiException
-
-/** JSON {"actions":[...]} plus the name of the source that produced it (rules, cloud, ...). */
-data class CommandReply(val json: String, val source: String)
-
-/** Turns a user prompt into a reply with JSON {"actions":[...]} for the action mapper. */
-interface CommandSource {
-    suspend fun ask(prompt: String): CommandReply
-}
+import com.example.soundengitoolkit.ai.domain.CommandReply
+import com.example.soundengitoolkit.ai.domain.CommandSource
 
 /** Offline, free, instant. Understands only a few fixed phrases. */
 class RulesSource : CommandSource {

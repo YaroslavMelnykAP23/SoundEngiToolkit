@@ -9,8 +9,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import com.example.soundengitoolkit.ai.data.CommandReply
-import com.example.soundengitoolkit.ai.data.CommandSource
+import com.example.soundengitoolkit.ai.domain.CommandReply
+import com.example.soundengitoolkit.ai.domain.CommandSource
 import com.example.soundengitoolkit.ai.data.HybridSource
 import com.example.soundengitoolkit.ai.data.RulesSource
 import com.example.soundengitoolkit.ai.domain.Ai

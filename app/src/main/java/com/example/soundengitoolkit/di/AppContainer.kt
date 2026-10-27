@@ -1,7 +1,7 @@
 package com.example.soundengitoolkit.di
 
-import com.example.soundengitoolkit.ai.data.CommandReply
-import com.example.soundengitoolkit.ai.data.CommandSource
+import com.example.soundengitoolkit.ai.domain.CommandReply
+import com.example.soundengitoolkit.ai.domain.CommandSource
 import com.example.soundengitoolkit.ai.data.FakeCommandSource
 import com.example.soundengitoolkit.ai.data.FirebaseSource
 import com.example.soundengitoolkit.ai.data.HybridSource

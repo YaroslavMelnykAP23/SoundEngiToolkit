@@ -14,7 +14,7 @@
 | `FirebaseSource` | Gemini через Firebase AI Logic, `responseMimeType = application/json`, системна інструкція `Ai.SYSTEM`; модель за замовчуванням `gemini-2.5-flash` (назву треба звіряти з документацією Firebase) | Firebase налаштовано (`google-services.json`, плагін), мережа |
 | `HybridSource` | за замовчуванням: спершу правила, якщо дій немає, то хмара | як вище |
 
-Змінити джерело: `Ai.source` у `Ai.kt`.
+Змінити джерело: `di/AppContainer.kt` (там збирається `HybridSource` і перемикач `useFake`). Інтерфейс `CommandSource` лежить у `ai/domain/CommandSource.kt`, реалізації в `ai/data/`.
 
 ## Формат даних
 

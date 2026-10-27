@@ -77,27 +77,45 @@ flowchart TB
     class AUTH,FS,ST planned
 ```
 
+## Структура пакетів
+
+Корінь: `app/src/main/java/com/example/soundengitoolkit/`. Тести в `app/src/test/...` повторюють ті самі пакети.
+
+| Пакет | Файли | Що лежить |
+|---|---|---|
+| (корінь) | `App.kt`, `MainActivity.kt` | точки входу з AndroidManifest |
+| `di` | `AppContainer.kt` | composition root |
+| `audio` | `Engine.kt`, `Dsp.kt`, `Wav.kt` | рушій, DSP, WAV |
+| `data` | `Db.kt`, `Store.kt` | Room і `ProjectStore` |
+| `ai.domain` | `AiAction.kt`, `AiError.kt`, `CommandSource.kt`, `AiActionMapper.kt`, `AiErrorMapper.kt`, `ActionExecutor.kt`, `RunAiCommandUseCase.kt`, `Ai.kt` | типи, інтерфейс джерела команд, парсинг, use case; без Android і Firebase |
+| `ai.data` | `CommandSources.kt`, `FakeCommandSource.kt` | реалізації `CommandSource` (Rules, Firebase, Hybrid, Fake) |
+| `ai.ui` | `AiCommandViewModel.kt`, `AiUiState.kt` | ViewModel і стани екрана |
+| `ui.library` | `LibraryUi.kt` | діалог збереження, список записів, історія AI |
+| `ui.theme` | `Color.kt`, `Theme.kt`, `Type.kt` | тема Compose |
+
+Напрям залежностей: `ai.ui` → `ai.domain` ← `ai.data`; `di` знає всі реалізації. `ai.domain` не імпортує `ai.data`.
+
 ## Компоненти
 
 | Компонент | Файл | Роль |
 |---|---|---|
 | UI | `MainActivity.kt` | `Screen` (головний екран з вкладками Studio / Library), `ScopePanel` (осцилограф, курсор, loop, сітка) |
-| Рушій | `Engine.kt` | аудіопотоки, запис, ланцюжок ефектів, master volume, кільцевий буфер осцилографа |
-| DSP | `Dsp.kt` | `Synth`, `Sampler`, `Eq`, `Comp`, `Delay`, `Reverb` |
-| AI-шар | `Ai.kt` | лише схема дій для моделі (`Ai.SYSTEM`) і тонка обгортка `Ai.apply` (використовується тестами) |
-| Use case | `RunAiCommandUseCase.kt` | сценарій «prompt → список дій»: валідація, виклик джерела, парсинг, повертає `Result<AiReply>`; не знає `Engine` |
-| ViewModel | `AiCommandViewModel.kt`, `AiUiState.kt` | стани Idle / Loading / Success / Error; `run` ігнорує повторні натискання під час Loading; `retry` повторює останній невдалий запит; дії до `Engine` застосовує колбек екрана (ViewModel не знає `Engine`) |
-| Типи AI | `AiAction.kt`, `AiError.kt` | `AiAction` (типізована дія), `AiError` (категорії: InvalidInput, Network, AiUnavailable, InvalidResponse, Unknown), `AiException` |
-| Парсинг | `AiActionMapper.kt` | JSON → `List<AiAction>`; чистий парсинг без доступу до `Engine` |
-| Виконання | `ActionExecutor.kt` | застосовує `List<AiAction>` до `Engine` тими ж сетерами, що й UI; формує лог |
-| Помилки | `AiErrorMapper.kt` | технічний виняток → `AiError`; `CancellationException` не ковтає |
-| Джерела команд | `CommandSource.kt` | інтерфейс `CommandSource` (повертає `CommandReply(json, source)`), `RulesSource`, `FirebaseSource`, `HybridSource`; типи Firebase SDK не виходять за межі `FirebaseSource` |
-| Fake | `FakeCommandSource.kt` | друга реалізація інтерфейсу з режимами SUCCESS, NETWORK_ERROR, UNAVAILABLE, INVALID_JSON; без мережі й ключів |
-| Composition root | `App.kt`, `AppContainer.kt` | `App` створює `AppContainer` один раз; контейнер єдине місце, де обираються реалізації (`useFake`) і збирається `RunAiCommandUseCase` |
-| Сховище | `Store.kt` | `ProjectStore` (збереження, завантаження, видалення, історія AI), `FxState` (ефекти в JSON), `ViewState` (курсор і маркери) |
-| База даних | `Db.kt` | Room: `ProjectEntity`, `AiEntryEntity`, `ProjectDao`, `AiDao`, `AppDb` |
-| WAV | `Wav.kt` | запис WAV 16 біт stereo (L=R), читання mono і stereo |
-| UI збереження | `LibraryUi.kt` | `SaveDialog`, `ProjectsPanel`, `HistoryPanel` |
+| Рушій | `audio/Engine.kt` | аудіопотоки, запис, ланцюжок ефектів, master volume, кільцевий буфер осцилографа |
+| DSP | `audio/Dsp.kt` | `Synth`, `Sampler`, `Eq`, `Comp`, `Delay`, `Reverb` |
+| AI-шар | `ai/domain/Ai.kt` | лише схема дій для моделі (`Ai.SYSTEM`) і тонка обгортка `Ai.apply` (використовується тестами) |
+| Use case | `ai/domain/RunAiCommandUseCase.kt` | сценарій «prompt → список дій»: валідація, виклик джерела, парсинг, повертає `Result<AiReply>`; не знає `Engine` |
+| ViewModel | `ai/ui/AiCommandViewModel.kt`, `ai/ui/AiUiState.kt` | стани Idle / Loading / Success / Error; `run` ігнорує повторні натискання під час Loading; `retry` повторює останній невдалий запит; дії до `Engine` застосовує колбек екрана (ViewModel не знає `Engine`) |
+| Типи AI | `ai/domain/AiAction.kt`, `ai/domain/AiError.kt` | `AiAction` (типізована дія), `AiError` (категорії: InvalidInput, Network, AiUnavailable, InvalidResponse, Unknown), `AiException` |
+| Парсинг | `ai/domain/AiActionMapper.kt` | JSON → `List<AiAction>`; чистий парсинг без доступу до `Engine` |
+| Виконання | `ai/domain/ActionExecutor.kt` | застосовує `List<AiAction>` до `Engine` тими ж сетерами, що й UI; формує лог |
+| Помилки | `ai/domain/AiErrorMapper.kt` | технічний виняток → `AiError`; `CancellationException` не ковтає |
+| Джерела команд | `ai/domain/CommandSource.kt`, `ai/data/CommandSources.kt` | інтерфейс `CommandSource` і `CommandReply(json, source)` у домені; реалізації `RulesSource`, `FirebaseSource`, `HybridSource` у `ai.data`; типи Firebase SDK не виходять за межі `FirebaseSource` |
+| Fake | `ai/data/FakeCommandSource.kt` | друга реалізація інтерфейсу з режимами SUCCESS, NETWORK_ERROR, UNAVAILABLE, INVALID_JSON; без мережі й ключів |
+| Composition root | `App.kt`, `di/AppContainer.kt` | `App` створює `AppContainer` один раз; контейнер єдине місце, де обираються реалізації (`useFake`) і збирається `RunAiCommandUseCase` |
+| Сховище | `data/Store.kt` | `ProjectStore` (збереження, завантаження, видалення, історія AI), `FxState` (ефекти в JSON), `ViewState` (курсор і маркери) |
+| База даних | `data/Db.kt` | Room: `ProjectEntity`, `AiEntryEntity`, `ProjectDao`, `AiDao`, `AppDb` |
+| WAV | `audio/Wav.kt` | запис WAV 16 біт stereo (L=R), читання mono і stereo |
+| UI збереження | `ui/library/LibraryUi.kt` | `SaveDialog`, `ProjectsPanel`, `HistoryPanel` |
 
 Backend: окремого сервера немає. Хмарні функції заплановані через Firebase (див. [decisions.md](decisions.md)).
 

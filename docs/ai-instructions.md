@@ -13,11 +13,13 @@
 | Задача | Де |
 |---|---|
 | UI, осцилограф, жести | `MainActivity.kt` (`Screen`, `ScopePanel`) |
-| Аудіопотоки, запис, volume, буфер осцилографа | `Engine.kt` |
-| Звукові блоки | `Dsp.kt` |
-| Схема й виконання AI-дій | `Ai.kt` |
-| Джерела команд | `CommandSource.kt` |
-| Збереження записів, історія AI | `Store.kt` (`ProjectStore`), `Db.kt` (Room), `Wav.kt`, `LibraryUi.kt` |
+| Аудіопотоки, запис, volume, буфер осцилографа | `audio/Engine.kt` |
+| Звукові блоки | `audio/Dsp.kt` |
+| Схема й виконання AI-дій | `ai/domain/` (`Ai.kt`, `AiActionMapper.kt`, `ActionExecutor.kt`, `RunAiCommandUseCase.kt`) |
+| Джерела команд | інтерфейс `ai/domain/CommandSource.kt`, реалізації `ai/data/CommandSources.kt`, `ai/data/FakeCommandSource.kt` |
+| Вибір реалізацій | `di/AppContainer.kt` |
+| Стан AI-екрана | `ai/ui/` (`AiCommandViewModel.kt`, `AiUiState.kt`) |
+| Збереження записів, історія AI | `data/Store.kt` (`ProjectStore`), `data/Db.kt` (Room), `audio/Wav.kt`, `ui/library/LibraryUi.kt` |
 
 ## Правила для аудіокоду (критично)
 
@@ -31,7 +33,7 @@
 - Схема дій живе у двох місцях, які завжди міняються разом: `Ai.SYSTEM` (промпт) і `Ai.apply` (виконання). Також онови `RulesSource` і [api-contract.md](api-contract.md).
 - Не віддавай AI прямий доступ до аудіо, файлів чи мережі: лише JSON-дії.
 - Нові джерела команд реалізуй через `CommandSource`.
-- Зміна схеми Room (`Db.kt`) потребує підвищення `version` і міграції; не вмикай `fallbackToDestructiveMigration` без дозволу людини, бо це видалить записи користувача.
+- Зміна схеми Room (`data/Db.kt`) потребує підвищення `version` і міграції; не вмикай `fallbackToDestructiveMigration` без дозволу людини, бо це видалить записи користувача.
 - Усі операції з файлами та базою виконуй у `Dispatchers.IO`, ніколи в аудіопотоці.
 - Звертання до Firebase лише лениво (`by lazy`), щоб додаток не падав без налаштування.
 

@@ -1,7 +1,6 @@
 package com.example.soundengitoolkit.ai.domain
 
 import kotlinx.coroutines.CancellationException
-import com.example.soundengitoolkit.ai.data.CommandSource
 
 /** Successful result: typed actions, the raw JSON (for history) and which source answered. */
 data class AiReply(val actions: List<AiAction>, val json: String, val source: String)

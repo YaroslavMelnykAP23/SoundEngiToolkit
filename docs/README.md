@@ -74,7 +74,7 @@ Windows: `gradlew` замість `./gradlew`.
 |---|---|
 | Аудіо | mono, 44 100 Гц, `PCM_FLOAT`, блок 256 семплів |
 | Потоки | UI, `audio-out`, `audio-in`, корутина `Dispatchers.IO` для AI |
-| Файли коду | `MainActivity.kt`, `LibraryUi.kt`, `Engine.kt`, `Dsp.kt`, `Ai.kt`, `CommandSource.kt`, `Store.kt`, `Db.kt`, `Wav.kt` |
+| Пакети коду | корінь (`App`, `MainActivity`), `di`, `audio`, `data`, `ai.domain`, `ai.data`, `ai.ui`, `ui.library`, `ui.theme` (див. [architecture.md](architecture.md)) |
 | Локальне сховище | Room (`soundengitoolkit.db`) + WAV у `filesDir/projects` |
 | Backend | немає; заплановано Firebase (Auth, Firestore, Storage) |
 | Автоматичні тести | JVM unit-тести без мережі й API key (`gradlew testDebugUnitTest`) |
@@ -88,4 +88,4 @@ Windows: `gradlew` замість `./gradlew`.
 - **Курсор**: точка, з якої починається відтворення. **Loop A-B**: ділянка між двома маркерами, що зациклюється.
 - **Master volume**: гучність виходу в дБ (змінює звук). **View gain**: масштаб картинки осцилографа (звук не змінює).
 - **Ефектний ланцюжок**: EQ → компресор → delay → reverb.
-- **AI-шар** (`Ai.kt`): код, що виконує JSON-дії. **Джерело команд** (`CommandSource`): те, що перетворює текст на JSON (правила або модель Gemini). Сама модель звуку не обробляє.
+- **AI-шар** (`ai/domain/`): код, що виконує JSON-дії. **Джерело команд** (`CommandSource`): те, що перетворює текст на JSON (правила або модель Gemini). Сама модель звуку не обробляє.

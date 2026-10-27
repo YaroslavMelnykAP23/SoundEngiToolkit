@@ -7,8 +7,6 @@ import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.IOException
-import com.example.soundengitoolkit.ai.data.CommandReply
-import com.example.soundengitoolkit.ai.data.CommandSource
 
 class RunAiCommandUseCaseTest {
     private class Stub(private val reply: String? = null, private val error: Throwable? = null) : CommandSource {

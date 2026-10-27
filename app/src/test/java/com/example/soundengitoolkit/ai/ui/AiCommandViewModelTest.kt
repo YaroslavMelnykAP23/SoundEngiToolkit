@@ -13,8 +13,8 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TestWatcher
 import org.junit.runner.Description
-import com.example.soundengitoolkit.ai.data.CommandReply
-import com.example.soundengitoolkit.ai.data.CommandSource
+import com.example.soundengitoolkit.ai.domain.CommandReply
+import com.example.soundengitoolkit.ai.domain.CommandSource
 import com.example.soundengitoolkit.ai.data.FakeCommandSource
 import com.example.soundengitoolkit.ai.domain.AiAction
 import com.example.soundengitoolkit.ai.domain.AiError
