@@ -26,6 +26,10 @@
 
 ### Changed
 - Код розкладено по пакетах `di`, `audio`, `data`, `ai.domain`, `ai.data`, `ai.ui`, `ui.library`; інтерфейс `CommandSource` перенесено в домен, реалізації лишились у `ai.data`.
+- Хмарна модель за замовчуванням: `gemini-3.5-flash` замість застарілої `gemini-2.5-flash`.
+
+### Security
+- Firebase App Check з debug-провайдером у debug-збірці; `firebase-appcheck-debug` більше не потрапляє в release.
 - Кнопка Retry повторює останній невдалий AI-запит (навіть якщо текст у полі змінено).
 
 ### Changed

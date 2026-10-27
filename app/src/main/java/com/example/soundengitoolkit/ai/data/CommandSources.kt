@@ -39,7 +39,7 @@ class RulesSource : CommandSource {
 class FirebaseSource(
     private val systemPrompt: String,
     // Check the current model name in Firebase AI Logic docs; names change over time.
-    modelName: String = "gemini-2.5-flash"
+    modelName: String = "gemini-3.5-flash"
 ) : CommandSource {
     // lazy: Firebase is touched only on the first cloud call, so a missing
     // google-services.json can no longer crash the app at startup.

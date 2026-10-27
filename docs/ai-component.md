@@ -11,7 +11,7 @@
 | Реалізація | Опис | Потребує |
 |---|---|---|
 | `RulesSource` | шаблони на ключових словах (bpm, delay + `1/N`, compress, reverb); офлайн, миттєво | нічого |
-| `FirebaseSource` | Gemini через Firebase AI Logic, `responseMimeType = application/json`, системна інструкція `Ai.SYSTEM`; модель за замовчуванням `gemini-2.5-flash` (назву треба звіряти з документацією Firebase) | Firebase налаштовано (`google-services.json`, плагін), мережа |
+| `FirebaseSource` | Gemini через Firebase AI Logic, `responseMimeType = application/json`, системна інструкція `Ai.SYSTEM`; модель за замовчуванням `gemini-3.5-flash` (назву треба звіряти з документацією Firebase) | Firebase налаштовано (`google-services.json`, плагін), мережа |
 | `HybridSource` | за замовчуванням: спершу правила, якщо дій немає, то хмара | як вище |
 
 Змінити джерело: `di/AppContainer.kt` (там збирається `HybridSource` і перемикач `useFake`). Інтерфейс `CommandSource` лежить у `ai/domain/CommandSource.kt`, реалізації в `ai/data/`.
@@ -38,5 +38,6 @@
 
 ## Безпека
 
-- Ключі API не зберігаються в коді. `google-services.json` не комітиться; ключі в Google Cloud обмежуються пакетом і SHA-1; рекомендовано Firebase App Check.
+- Ключі API не зберігаються в коді. `google-services.json` не комітиться; ключі в Google Cloud обмежуються пакетом і SHA-1.
+- App Check: у debug-збірці `di/AppCheckSetup.kt` (`app/src/debug`) ставить `DebugAppCheckProviderFactory`; debug-токен з Logcat (тег `DebugAppCheckProvider`) додається в консолі Firebase → App Check → Manage debug tokens. У release-збірці (`app/src/release`) провайдера поки немає, тому вмикати enforcement можна лише після додавання Play Integrity.
 - Команди користувача виконують лише дозволені `fx`; довільний код чи доступ до файлів через AI неможливі.

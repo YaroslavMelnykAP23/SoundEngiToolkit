@@ -34,7 +34,7 @@ Android-додаток (Kotlin, Jetpack Compose): семплер + синтез�
    ksp("androidx.room:room-compiler:2.8.4")
    implementation(platform("com.google.firebase:firebase-bom:<версія>"))
    implementation("com.google.firebase:firebase-ai")
-   implementation("com.google.firebase:firebase-appcheck-debug")
+   debugImplementation("com.google.firebase:firebase-appcheck-debug")   // лише debug-збірка
    ```
 3. Для хмарного AI: `google-services.json` у `app/` і плагін `com.google.gms.google-services`. Файл **не комітити**. Без нього додаток працює, а AI обмежується правилами.
 4. Запуск: `./gradlew assembleDebug`, потім Run на реальному пристрої. Версії `minSdk`, `compileSdk`, Kotlin і Compose дивитися в `app/build.gradle.kts` (рішення про `minSdk` ще відкрите, див. [decisions.md](decisions.md)).
