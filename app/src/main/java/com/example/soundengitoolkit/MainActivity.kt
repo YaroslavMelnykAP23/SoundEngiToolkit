@@ -66,6 +66,7 @@ fun Screen(e: Engine) {
     var status by remember { mutableStateOf("") }
     var vol by remember { mutableFloatStateOf(0f) }
     val ctx = LocalContext.current
+    val container = (ctx.applicationContext as App).container
     val store = remember { ProjectStore(ctx) }
     val projects by store.projects.collectAsState(initial = emptyList())
     val history by store.history.collectAsState(initial = emptyList())
@@ -172,18 +173,17 @@ fun Screen(e: Engine) {
                 OutlinedTextField(prompt, { prompt = it }, Modifier.fillMaxWidth(), label = { Text("AI command") })
                 Button(onClick = {
                     scope.launch {
-                        var json = ""
-                        var src = ""
-                        val result = try {
-                            withContext(Dispatchers.IO) {
-                                val reply = Ai.ask(prompt)
-                                json = reply.json; src = reply.source
-                                Ai.apply(e, json)
-                            } to true
-                        } catch (ex: Throwable) { "Error: ${ex.javaClass.simpleName}: ${ex.message}" to false }
-                        log = result.first.ifBlank { "No actions recognized" }
+                        val r = container.runAiCommand(prompt)
+                        val reply = r.getOrNull()
+                        val log0 = when {
+                            reply != null -> withContext(Dispatchers.IO) { ActionExecutor.apply(e, reply.actions) }
+                            else -> "Error: " + ((r.exceptionOrNull() as? AiException)?.error ?: AiError.Unknown)
+                        }
+                        log = log0.ifBlank { "No actions recognized" }
                         sync()
-                        runCatching { store.logAi(prompt, json, result.first, src.ifEmpty { "unknown" }, result.second && result.first.isNotBlank()) }
+                        runCatching {
+                            store.logAi(prompt, reply?.json ?: "", log0, reply?.source ?: "error", reply != null && log0.isNotBlank())
+                        }
                     }
                 }) { Text("Run") }
                 Text(log, style = MaterialTheme.typography.bodySmall)

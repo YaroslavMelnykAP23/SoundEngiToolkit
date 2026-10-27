@@ -55,7 +55,15 @@ class FirebaseSource(
     }
 
     override suspend fun ask(prompt: String): CommandReply {
-        val text = model.generateContent(prompt).text ?: error("Empty AI response")
+        val text = try {
+            model.generateContent(prompt).text
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: java.io.IOException) {
+            throw e                                        // mapped to Network by AiErrorMapper
+        } catch (e: Exception) {
+            throw AiException(AiError.AiUnavailable, e)    // Firebase not configured, quota, model refused
+        } ?: throw AiException(AiError.AiUnavailable)      // empty reply
         return CommandReply(text.replace("```json", "").replace("```", "").trim(), "cloud")
     }
 }
