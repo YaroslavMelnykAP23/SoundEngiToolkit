@@ -1,13 +1,12 @@
 package com.example.soundengitoolkit
 
-import org.json.JSONObject
-
 /**
  * AI never touches audio directly: a CommandSource returns a JSON list of actions,
  * and the app executes them through the same setters the UI uses.
  */
 object Ai {
     // Temporary global wiring; moves to the composition root in step 5.
+    // Swap the source here: RulesSource(), FirebaseSource(SYSTEM), or the hybrid below.
     var source: CommandSource = HybridSource(RulesSource(), FirebaseSource(SYSTEM))
 
     suspend fun ask(prompt: String): CommandReply = source.ask(prompt)
@@ -21,30 +20,7 @@ object Ai {
 {"fx":"eq","on":bool,"low":-12..12,"mid":-12..12,"high":-12..12}
 Omit fields the user did not ask to change."""
 
-    /** Runs on any thread; returns human-readable log. */
-    fun apply(e: Engine, json: String): String {
-        val log = StringBuilder()
-        val arr = JSONObject(json).getJSONArray("actions")
-        for (i in 0 until arr.length()) {
-            val o = arr.getJSONObject(i)
-            fun f(k: String, d: Float) = if (o.has(k)) o.getDouble(k).toFloat() else d
-            when (val fx = o.getString("fx")) {
-                "bpm" -> e.bpm = f("value", e.bpm)
-                "delay" -> e.delay.apply {
-                    on = o.optBoolean("on", on); denom = o.optInt("division", denom)
-                    fb = f("feedback", fb); mix = f("mix", mix); sync(e.bpm)
-                }
-                "reverb" -> e.reverb.apply { on = o.optBoolean("on", on); mix = f("mix", mix); size = f("size", size) }
-                "compressor" -> e.comp.apply {
-                    on = o.optBoolean("on", on); set(f("threshold", -18f), f("ratio", 4f))
-                }
-                "eq" -> e.eq.apply {
-                    on = o.optBoolean("on", true); set(f("low", 0f), f("mid", 0f), f("high", 0f))
-                }
-                else -> { log.append("? $fx\n"); continue }
-            }
-            log.append("✓ $o\n")
-        }
-        return log.toString()
-    }
+    /** Runs on any thread; returns human-readable log. Parses everything first, then applies. */
+    fun apply(e: Engine, json: String): String =
+        ActionExecutor.apply(e, AiActionMapper.parse(json))
 }

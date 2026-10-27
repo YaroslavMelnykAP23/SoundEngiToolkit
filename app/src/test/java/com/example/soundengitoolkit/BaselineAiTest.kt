@@ -5,6 +5,7 @@ import kotlinx.coroutines.runBlocking
 import org.json.JSONException
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -67,14 +68,13 @@ class BaselineAiTest {
         assertThrows(JSONException::class.java) { Ai.apply(Engine(), "not json") }
     }
 
-    @Test fun apply_partialOnError_firstActionStaysApplied() {   // problem #10
+    @Test fun apply_invalidAction_appliesNothing() {   // deliberate change, step 3 (was: partial apply)
         val e = Engine()
         assertThrows(JSONException::class.java) {
             Ai.apply(e, """{"actions":[{"fx":"reverb","on":true},{}]}""")
         }
-        assertTrue(e.reverb.on)
+        assertFalse(e.reverb.on)
     }
-
     // ---- HybridSource ----
 
     @Test fun hybrid_cloudFails_fallsBackToRules() = runBlocking {
