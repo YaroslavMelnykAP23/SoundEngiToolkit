@@ -101,4 +101,77 @@ class AiCommandViewModelTest {
         advance()
         assertEquals(AiUiState.Success("ok", "fake"), vm.state.value)
     }
+
+    @Test fun slowSource_staysLoading_andRepeatedRunIsIgnored() {
+        val fake = FakeCommandSource(delayMs = 1000)
+        val vm = vm(fake)
+        vm.run("a") { "" }
+        main.dispatcher.scheduler.advanceTimeBy(500)
+        main.dispatcher.scheduler.runCurrent()
+        assertEquals(AiUiState.Loading, vm.state.value)      // still waiting for the source
+        vm.run("b") { "" }                                   // must be ignored
+        advance()
+        assertEquals(1, fake.calls)
+        assertEquals(1, history.size)
+        assertTrue(vm.state.value is AiUiState.Success)
+    }
+
+    // ---- Retry (step 7) ----
+
+    @Test fun retry_afterFailure_rerunsSamePrompt_andSucceeds() {
+        val fake = FakeCommandSource(FakeCommandSource.Mode.FAIL_ONCE)
+        val vm = vm(fake)
+        vm.run("add reverb") { "ok" }
+        advance()
+        val err = vm.state.value as AiUiState.Error
+        assertEquals(AiError.Network, err.error)
+        assertTrue(err.retryable)
+        vm.retry { "ok" }
+        assertEquals(AiUiState.Loading, vm.state.value)
+        advance()
+        assertEquals(AiUiState.Success("ok", "fake"), vm.state.value)
+        assertEquals(2, fake.calls)
+        assertEquals(listOf("add reverb", "add reverb"), history.map { it.first })   // same prompt, not new text
+    }
+
+    @Test fun retry_afterSecondFailure_staysRetryable() {
+        val fake = FakeCommandSource(FakeCommandSource.Mode.NETWORK_ERROR)
+        val vm = vm(fake)
+        vm.run("x") { "" }
+        advance()
+        vm.retry { "" }
+        advance()
+        assertTrue((vm.state.value as AiUiState.Error).retryable)
+        assertEquals(2, fake.calls)
+    }
+
+    @Test fun invalidInput_isNotRetryable_andRetryDoesNothing() {
+        val fake = FakeCommandSource()
+        val vm = vm(fake)
+        vm.run("   ") { "" }
+        advance()
+        assertFalse((vm.state.value as AiUiState.Error).retryable)
+        vm.retry { "" }
+        advance()
+        assertEquals(0, fake.calls)
+    }
+
+    @Test fun retry_withoutFailure_doesNothing() {
+        val fake = FakeCommandSource()
+        val vm = vm(fake)
+        vm.retry { "" }
+        advance()
+        assertEquals(AiUiState.Idle, vm.state.value)
+        assertEquals(0, fake.calls)
+    }
+
+    @Test fun retry_afterSuccess_doesNothing() {
+        val fake = FakeCommandSource()
+        val vm = vm(fake)
+        vm.run("add reverb") { "ok" }
+        advance()
+        vm.retry { "ok" }
+        advance()
+        assertEquals(1, fake.calls)
+    }
 }

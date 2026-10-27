@@ -106,6 +106,8 @@ fun Screen(e: Engine, ai: AiCommandViewModel) {
         fxState["Delay"] = e.delay.on; fxState["Reverb"] = e.reverb.on; bpm = e.bpm
     }
 
+    val applyActions: (List<AiAction>) -> String = { actions -> ActionExecutor.apply(e, actions).also { sync() } }
+
     Column(Modifier.fillMaxSize().background(Color(0xFF111111)).safeDrawingPadding()) {
         Text("SoundEngiToolkit", Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 8.dp),
             style = MaterialTheme.typography.titleLarge)
@@ -186,14 +188,16 @@ fun Screen(e: Engine, ai: AiCommandViewModel) {
                 OutlinedTextField(prompt, { prompt = it }, Modifier.fillMaxWidth(), label = { Text("AI command") })
                 Button(
                     enabled = aiState !is AiUiState.Loading,
-                    onClick = { ai.run(prompt) { actions -> ActionExecutor.apply(e, actions).also { sync() } } }
+                    onClick = { ai.run(prompt, applyActions) }
                 ) { Text(if (aiState is AiUiState.Loading) "Running..." else "Run") }
                 when (val s = aiState) {
                     AiUiState.Idle -> {}
                     AiUiState.Loading -> Text("Waiting for AI...", style = MaterialTheme.typography.bodySmall)
                     is AiUiState.Success -> Text(s.log, style = MaterialTheme.typography.bodySmall)
-                    is AiUiState.Error -> Text(s.message, style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFFFF8A80))
+                    is AiUiState.Error -> {
+                        Text(s.message, style = MaterialTheme.typography.bodySmall, color = Color(0xFFFF8A80))
+                        if (s.retryable) OutlinedButton(onClick = { ai.retry(applyActions) }) { Text("Retry") }
+                    }
                 }
                 HistoryPanel(history, onPick = { prompt = it }, onClear = { scope.launch { runCatching { store.clearHistory() } } })
             } else {

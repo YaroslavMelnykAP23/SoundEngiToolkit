@@ -80,7 +80,7 @@ class HybridSource(private val rules: CommandSource, private val cloud: CommandS
             throw e                                        // cancellation is not a cloud failure
         } catch (e: Exception) {
             // For diagnosing cloud failures, temporarily add here:
-            android.util.Log.w("HybridSource", "cloud failed", e)
+            // android.util.Log.w("HybridSource", "cloud failed", e)
             CommandReply(r.json, "rules (cloud failed)")
         }
     }

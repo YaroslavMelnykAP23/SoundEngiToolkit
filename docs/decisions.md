@@ -67,5 +67,11 @@ D-17 (доповнення): `ViewState` має поле `owner` (посилан
 
 ## D-23: «AiCommandViewModel створюється через by viewModels з фабрикою в MainActivity, залежності беруться з AppContainer. viewModel() з lifecycle-viewmodel-compose не використано, щоб не додавати залежність.»
 
+## D-24: Retry повторює збережений у ViewModel запит, а не текст поля
+Користувач може змінити поле між помилкою й повтором, тому `AiCommandViewModel` пам'ятає `lastFailedPrompt`. Повторюються всі помилки, окрім `InvalidInput` (повтор порожнього вводу безглуздий). Розширення змінило лише шар presentation (`AiUiState`, `AiCommandViewModel`, `Screen`); use case, джерела й composition root не чіпалися.
+
+## D-25: `FakeCommandSource` має режим `FAIL_ONCE` і параметр `delayMs`
+`FAIL_ONCE` (перший виклик падає, наступні успішні) перевіряє повтор без мережі. `delayMs` робить стан Loading видимим на екрані й у тесті (без нього правила відповідають миттєво).
+
 ## Відкрите рішення
 - `minSdk`: заявлено «Android 17+», але аудіофункціям вистачає API 29-30. Рекомендовано знизити; фінальне значення зафіксувати тут після перевірки `build.gradle.kts`.

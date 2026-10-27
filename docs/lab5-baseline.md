@@ -19,9 +19,9 @@
 | 6 | `Ai.apply`: `{"fx":"eq","low":3}` | `eq.on=true`, `low=3`, `mid=0`, `high=0` (L-04) | `apply_eqWithoutOn_enablesAndResets` | pass |
 | 7 | `Ai.apply`: compressor без числових полів | `threshold=-18`, `ratio=4` | `apply_compressorMissingFields_resetToDefaults` | pass |
 | 8 | `Ai.apply`: `not json` | `JSONException` | `apply_invalidJson_throws` | pass |
-| 9 | `Ai.apply`: `[reverb on, {}]` | виняток, але `reverb.on=true` (часткове застосування) | `apply_partialOnError_firstActionStaysApplied` | pass |
-| 10 | `HybridSource`: правила порожні, хмара кидає виняток | `{"actions":[]}`, `lastUsed="rules (cloud failed)"` | `hybrid_cloudFails_fallsBackToRules` | pass |
-| 11 | `HybridSource`: правила розпізнали фразу | хмара не викликається, `lastUsed="rules"` | `hybrid_rulesRecognized_cloudNotNeeded` | pass |
+| 9 | `Ai.apply`: `[reverb on, {}]` | `JSONException`, `reverb.on=false` (часткового застосування більше немає; свідома зміна, крок 3) | `apply_invalidAction_appliesNothing` | <pass/fail> |
+| 10 | `HybridSource`: правила порожні, хмара кидає виняток | `{"actions":[]}`, `reply.source="rules (cloud failed)"` | `hybrid_cloudFails_fallsBackToRules` | pass |
+| 11 | `HybridSource`: правила розпізнали фразу | хмара не викликається, `reply.source="rules"` | `hybrid_rulesRecognized_cloudNotNeeded` | pass |
 
 Команда запуску: `gradlew testDebugUnitTest`
 Результат: <N tests, N passed, N failed>. Якщо щось впало, опишіть, що саме і чому очікування довелося змінити.
@@ -47,7 +47,7 @@ UI-обробник Run не можна перевірити юніт-тесто
 
 ## 4. Свідомі зміни поведінки в рефакторингу
 
-Заповнюється під час Задачі 3.
+Заповнено під час рефакторингу (кроки 2-7).
 
 | Що змінилось | Крок | Чому | Тест |
 |---|---|---|---|
@@ -59,3 +59,4 @@ UI-обробник Run не можна перевірити юніт-тесто
 | Run неактивна під час запиту, повторні натискання ігноруються (було: кілька паралельних запитів і записів в історії) | 6 | стан Loading, проблема №8 | secondRunWhileLoading_isIgnored, ручний сценарій 3 |
 | Порожній ввід дає Enter a command first (було: No actions recognized) | 6 | категорія InvalidInput | blankPrompt_isInvalidInput_andSourceNotCalled |
 | Помилки показуються текстом за категорією, а не Error: <клас>: <повідомлення> | 4, 6 | проблема №3 | networkError_isErrorState_withoutApplying |
+| Після помилки з'являється кнопка Retry, яка повторює той самий запит (було: вводити вручну) | 7 | розширення | retry_afterFailure_rerunsSamePrompt_andSucceeds |

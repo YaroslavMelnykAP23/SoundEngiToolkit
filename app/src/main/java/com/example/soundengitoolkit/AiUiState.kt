@@ -5,7 +5,11 @@ sealed interface AiUiState {
     data object Idle : AiUiState
     data object Loading : AiUiState
     data class Success(val log: String, val source: String) : AiUiState
-    data class Error(val error: AiError, val message: String = error.userMessage()) : AiUiState
+    data class Error(
+        val error: AiError,
+        val message: String = error.userMessage(),
+        val retryable: Boolean = error != AiError.InvalidInput   // retrying a blank prompt makes no sense
+    ) : AiUiState
 }
 
 /** Category -> text for the user. No exception classes, no stack traces. */

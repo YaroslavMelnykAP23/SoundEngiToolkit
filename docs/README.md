@@ -49,6 +49,25 @@ Android-додаток (Kotlin, Jetpack Compose): семплер + синтез�
 **Зовнішня залежність за інтерфейсом:** `CommandSource` (хмарне джерело: Gemini через
 Firebase AI Logic).
 
+**Реалізації інтерфейсу:**
+- real: `FirebaseSource` (Gemini), `HybridSource` (правила + хмара);
+- fake: `FakeCommandSource` (режими success / error / fail once, опційна затримка), для тестів і debug.
+
+**Результат рефакторингу:** `UI (MainActivity) → AiCommandViewModel (AiUiState) → RunAiCommandUseCase → CommandSource`;
+залежності збирає `AppContainer` (ручний DI, composition root). Деталі: [architecture.md](architecture.md), [decisions.md](decisions.md), [lab5-baseline.md](lab5-baseline.md), [known-limitations.md](known-limitations.md).
+
+**Контрольне розширення:** повтор останнього невдалого запиту без втрати введених даних (кнопка Retry).
+Змінено лише шар presentation (`AiUiState`, `AiCommandViewModel`, `Screen`); use case, джерела й composition root не чіпалися.
+
+**Команди:**
+
+| Дія | Команда |
+|---|---|
+| Збірка | `./gradlew assembleDebug` |
+| Unit-тести (без мережі й API key) | `./gradlew testDebugUnitTest` |
+
+Windows: `gradlew` замість `./gradlew`.
+
 ## Ключові факти
 
 | Параметр | Значення |
@@ -58,7 +77,7 @@ Firebase AI Logic).
 | Файли коду | `MainActivity.kt`, `LibraryUi.kt`, `Engine.kt`, `Dsp.kt`, `Ai.kt`, `CommandSource.kt`, `Store.kt`, `Db.kt`, `Wav.kt` |
 | Локальне сховище | Room (`soundengitoolkit.db`) + WAV у `filesDir/projects` |
 | Backend | немає; заплановано Firebase (Auth, Firestore, Storage) |
-| Автоматичні тести | немає |
+| Автоматичні тести | JVM unit-тести без мережі й API key (`gradlew testDebugUnitTest`) |
 
 ## Словник
 
