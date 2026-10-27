@@ -1,4 +1,4 @@
-package com.example.soundengitoolkit
+package com.example.soundengitoolkit.audio
 
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList

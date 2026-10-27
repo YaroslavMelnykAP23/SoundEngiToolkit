@@ -1,4 +1,4 @@
-package com.example.soundengitoolkit
+package com.example.soundengitoolkit.audio
 
 import java.io.File
 import java.nio.ByteBuffer

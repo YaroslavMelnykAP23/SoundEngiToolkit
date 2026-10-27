@@ -1,4 +1,4 @@
-package com.example.soundengitoolkit
+package com.example.soundengitoolkit.ai.domain
 
 /**
  * Typed AI action. Null fields mean "not specified by the source".

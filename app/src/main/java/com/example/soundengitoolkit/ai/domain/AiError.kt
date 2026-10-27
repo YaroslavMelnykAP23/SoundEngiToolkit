@@ -1,4 +1,4 @@
-package com.example.soundengitoolkit
+package com.example.soundengitoolkit.ai.domain
 
 /** Controlled error categories for the AI command scenario (UI never sees raw exceptions). */
 sealed interface AiError {

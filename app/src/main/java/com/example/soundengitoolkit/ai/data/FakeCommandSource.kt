@@ -1,7 +1,9 @@
-package com.example.soundengitoolkit
+package com.example.soundengitoolkit.ai.data
 
 import kotlinx.coroutines.delay
 import java.io.IOException
+import com.example.soundengitoolkit.ai.domain.AiError
+import com.example.soundengitoolkit.ai.domain.AiException
 
 /** Second implementation of [CommandSource]: no network, no keys. For tests and the debug switch. */
 class FakeCommandSource(

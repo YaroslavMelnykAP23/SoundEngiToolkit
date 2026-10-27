@@ -1,4 +1,4 @@
-package com.example.soundengitoolkit
+package com.example.soundengitoolkit.ai.domain
 
 import kotlinx.coroutines.CancellationException
 import org.json.JSONException

@@ -1,4 +1,6 @@
-package com.example.soundengitoolkit
+package com.example.soundengitoolkit.ai.ui
+
+import com.example.soundengitoolkit.ai.domain.AiError
 
 /** What the AI command block of the screen shows. */
 sealed interface AiUiState {

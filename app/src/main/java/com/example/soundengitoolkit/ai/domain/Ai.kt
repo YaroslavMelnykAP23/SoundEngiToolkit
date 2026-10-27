@@ -1,4 +1,6 @@
-package com.example.soundengitoolkit
+package com.example.soundengitoolkit.ai.domain
+
+import com.example.soundengitoolkit.audio.Engine
 
 /**
  * AI never touches audio directly: a CommandSource returns a JSON list of actions,

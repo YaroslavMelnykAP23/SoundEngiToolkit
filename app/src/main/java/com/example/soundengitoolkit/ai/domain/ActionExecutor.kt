@@ -1,4 +1,6 @@
-package com.example.soundengitoolkit
+package com.example.soundengitoolkit.ai.domain
+
+import com.example.soundengitoolkit.audio.Engine
 
 /** Applies typed actions to the Engine through the same setters the UI uses. Returns a human-readable log. */
 object ActionExecutor {

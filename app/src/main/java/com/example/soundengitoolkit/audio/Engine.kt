@@ -1,4 +1,4 @@
-package com.example.soundengitoolkit
+package com.example.soundengitoolkit.audio
 
 import android.annotation.SuppressLint
 import android.media.*

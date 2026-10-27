@@ -1,4 +1,4 @@
-package com.example.soundengitoolkit
+package com.example.soundengitoolkit.ai.data
 
 import com.google.firebase.Firebase
 import com.google.firebase.ai.ai
@@ -8,6 +8,8 @@ import com.google.firebase.ai.type.generationConfig
 import kotlinx.coroutines.CancellationException
 import org.json.JSONArray
 import org.json.JSONObject
+import com.example.soundengitoolkit.ai.domain.AiError
+import com.example.soundengitoolkit.ai.domain.AiException
 
 /** JSON {"actions":[...]} plus the name of the source that produced it (rules, cloud, ...). */
 data class CommandReply(val json: String, val source: String)

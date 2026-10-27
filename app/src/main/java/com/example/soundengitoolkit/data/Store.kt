@@ -1,4 +1,4 @@
-package com.example.soundengitoolkit
+package com.example.soundengitoolkit.data
 
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
@@ -6,6 +6,8 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
 import java.util.UUID
+import com.example.soundengitoolkit.audio.Engine
+import com.example.soundengitoolkit.audio.Wav
 
 /** Cursor, loop markers and loop switch of the oscilloscope (in samples). */
 class ViewState(var cursor: Int = 0, var loopA: Int = 0, var loopB: Int = 0, var loopOn: Boolean = false) {

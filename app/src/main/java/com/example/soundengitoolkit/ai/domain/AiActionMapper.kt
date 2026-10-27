@@ -1,4 +1,4 @@
-package com.example.soundengitoolkit
+package com.example.soundengitoolkit.ai.domain
 
 import org.json.JSONObject
 

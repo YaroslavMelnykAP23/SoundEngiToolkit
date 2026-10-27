@@ -1,4 +1,4 @@
-package com.example.soundengitoolkit
+package com.example.soundengitoolkit.ui.library
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -11,6 +11,9 @@ import androidx.compose.ui.unit.dp
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.example.soundengitoolkit.audio.SR
+import com.example.soundengitoolkit.data.AiEntryEntity
+import com.example.soundengitoolkit.data.ProjectEntity
 
 fun defaultProjectName(): String =
     "Recording " + SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())

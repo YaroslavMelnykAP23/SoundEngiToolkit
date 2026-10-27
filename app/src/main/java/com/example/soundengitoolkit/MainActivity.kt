@@ -39,6 +39,18 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import kotlinx.coroutines.launch
+import com.example.soundengitoolkit.ai.domain.ActionExecutor
+import com.example.soundengitoolkit.ai.domain.AiAction
+import com.example.soundengitoolkit.ai.ui.AiCommandViewModel
+import com.example.soundengitoolkit.ai.ui.AiUiState
+import com.example.soundengitoolkit.audio.Engine
+import com.example.soundengitoolkit.audio.SR
+import com.example.soundengitoolkit.data.ProjectStore
+import com.example.soundengitoolkit.data.ViewState
+import com.example.soundengitoolkit.ui.library.HistoryPanel
+import com.example.soundengitoolkit.ui.library.ProjectsPanel
+import com.example.soundengitoolkit.ui.library.SaveDialog
+import com.example.soundengitoolkit.ui.library.defaultProjectName
 
 class MainActivity : ComponentActivity() {
     private val engine = Engine()

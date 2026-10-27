@@ -1,8 +1,14 @@
-package com.example.soundengitoolkit
+package com.example.soundengitoolkit.ai.data
 
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import com.example.soundengitoolkit.ai.domain.AiAction
+import com.example.soundengitoolkit.ai.domain.AiError
+import com.example.soundengitoolkit.ai.domain.AiException
+import com.example.soundengitoolkit.ai.domain.AiReply
+import com.example.soundengitoolkit.ai.domain.RunAiCommandUseCase
+import com.example.soundengitoolkit.di.AppContainer
 
 class FakeCommandSourceTest {
     private fun run(mode: FakeCommandSource.Mode, prompt: String = "x") =

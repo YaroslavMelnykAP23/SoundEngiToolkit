@@ -1,4 +1,4 @@
-package com.example.soundengitoolkit
+package com.example.soundengitoolkit.ai.ui
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -13,6 +13,12 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TestWatcher
 import org.junit.runner.Description
+import com.example.soundengitoolkit.ai.data.CommandReply
+import com.example.soundengitoolkit.ai.data.CommandSource
+import com.example.soundengitoolkit.ai.data.FakeCommandSource
+import com.example.soundengitoolkit.ai.domain.AiAction
+import com.example.soundengitoolkit.ai.domain.AiError
+import com.example.soundengitoolkit.ai.domain.RunAiCommandUseCase
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MainDispatcherRule(val dispatcher: TestDispatcher = StandardTestDispatcher()) : TestWatcher() {

@@ -1,4 +1,4 @@
-package com.example.soundengitoolkit
+package com.example.soundengitoolkit.ai.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -7,6 +7,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import com.example.soundengitoolkit.ai.domain.AiAction
+import com.example.soundengitoolkit.ai.domain.AiError
+import com.example.soundengitoolkit.ai.domain.AiException
+import com.example.soundengitoolkit.ai.domain.RunAiCommandUseCase
 
 class AiCommandViewModel(
     private val runAiCommand: RunAiCommandUseCase,

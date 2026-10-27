@@ -1,4 +1,4 @@
-package com.example.soundengitoolkit
+package com.example.soundengitoolkit.data
 
 import android.content.Context
 import androidx.room.*

@@ -1,4 +1,13 @@
-package com.example.soundengitoolkit
+package com.example.soundengitoolkit.di
+
+import com.example.soundengitoolkit.ai.data.CommandReply
+import com.example.soundengitoolkit.ai.data.CommandSource
+import com.example.soundengitoolkit.ai.data.FakeCommandSource
+import com.example.soundengitoolkit.ai.data.FirebaseSource
+import com.example.soundengitoolkit.ai.data.HybridSource
+import com.example.soundengitoolkit.ai.data.RulesSource
+import com.example.soundengitoolkit.ai.domain.Ai
+import com.example.soundengitoolkit.ai.domain.RunAiCommandUseCase
 
 /** The only place where concrete implementations are chosen and wired. */
 class AppContainer(initialUseFake: Boolean = false) {
