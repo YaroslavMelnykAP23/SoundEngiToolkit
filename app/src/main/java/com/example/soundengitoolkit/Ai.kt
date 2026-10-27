@@ -7,13 +7,10 @@ import org.json.JSONObject
  * and the app executes them through the same setters the UI uses.
  */
 object Ai {
-    // Swap the source here: RulesSource(), FirebaseSource(), or the hybrid below.
-    var source: CommandSource = HybridSource(RulesSource(), FirebaseSource())
+    // Temporary global wiring; moves to the composition root in step 5.
+    var source: CommandSource = HybridSource(RulesSource(), FirebaseSource(SYSTEM))
 
-    suspend fun ask(prompt: String): String = source.ask(prompt)
-
-    /** Name of the source that answered the last command (for the history). */
-    fun lastSource(): String = (source as? HybridSource)?.lastUsed ?: source::class.simpleName ?: "unknown"
+    suspend fun ask(prompt: String): CommandReply = source.ask(prompt)
 
     const val SYSTEM = """You control an audio app. Reply with ONLY a JSON object, no prose, no markdown:
 {"actions":[...]}. Allowed actions:

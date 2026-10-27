@@ -1,23 +1,28 @@
 package com.example.soundengitoolkit
 
-import junit.framework.TestCase.assertEquals
-import junit.framework.TestCase.assertTrue
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import org.json.JSONException
 import org.json.JSONObject
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.io.IOException
 
 class BaselineAiTest {
     private class Stub(private val reply: String? = null, private val error: Throwable? = null) : CommandSource {
-        override suspend fun ask(prompt: String): String { error?.let { throw it }; return reply!! }
+        override suspend fun ask(prompt: String): CommandReply {
+            error?.let { throw it }
+            return CommandReply(reply!!, "stub")
+        }
     }
 
-    private fun rules(p: String) = JSONObject(runBlocking { RulesSource().ask(p) }).getJSONArray("actions")
+    private fun rules(p: String) =
+        JSONObject(runBlocking { RulesSource().ask(p) }.json).getJSONArray("actions")
 
-    @Test
-    fun rules_fullExample() {
+    // ---- RulesSource ----
+
+    @Test fun rules_fullExample() {
         val a = rules("add delay 1/8 at 120 bpm and turn on compressor")
         assertEquals(3, a.length())
         assertEquals("bpm", a.getJSONObject(0).getString("fx"))
@@ -31,6 +36,8 @@ class BaselineAiTest {
 
     @Test fun rules_ukrainianDelay_division16() =
         assertEquals(16, rules("ділей 1/16").getJSONObject(0).getInt("division"))
+
+    // ---- Ai.apply ----
 
     @Test fun apply_delay_setsFields() {
         val e = Engine()
@@ -60,7 +67,7 @@ class BaselineAiTest {
         assertThrows(JSONException::class.java) { Ai.apply(Engine(), "not json") }
     }
 
-    @Test fun apply_partialOnError_firstActionStaysApplied() {   // проблема №10
+    @Test fun apply_partialOnError_firstActionStaysApplied() {   // problem #10
         val e = Engine()
         assertThrows(JSONException::class.java) {
             Ai.apply(e, """{"actions":[{"fx":"reverb","on":true},{}]}""")
@@ -68,16 +75,29 @@ class BaselineAiTest {
         assertTrue(e.reverb.on)
     }
 
+    // ---- HybridSource ----
+
     @Test fun hybrid_cloudFails_fallsBackToRules() = runBlocking {
-        val h = HybridSource(RulesSource(), Stub(error = IOException("offline")))
+        val h = HybridSource(RulesSource(), Stub(error = java.io.IOException("offline")))
         val r = h.ask("make it warmer")
-        assertEquals(0, JSONObject(r).getJSONArray("actions").length())
-        assertEquals("rules (cloud failed)", h.lastUsed)
+        assertEquals(0, JSONObject(r.json).getJSONArray("actions").length())
+        assertEquals("rules (cloud failed)", r.source)
     }
 
     @Test fun hybrid_rulesRecognized_cloudNotNeeded() = runBlocking {
-        val h =
-            HybridSource(RulesSource(), Stub(error = IllegalStateException("must not be called")))
-        h.ask("reverb"); assertEquals("rules", h.lastUsed)
+        val h = HybridSource(RulesSource(), Stub(error = IllegalStateException("must not be called")))
+        assertEquals("rules", h.ask("reverb").source)
+    }
+
+    @Test fun hybrid_cloudSucceeds_sourceIsCloud() = runBlocking {
+        val h = HybridSource(RulesSource(), Stub(reply = """{"actions":[{"fx":"reverb","on":true}]}"""))
+        val r = h.ask("make it warmer")
+        assertEquals("cloud", r.source)
+        assertEquals(1, JSONObject(r.json).getJSONArray("actions").length())
+    }
+
+    @Test fun hybrid_cancellation_isNotSwallowed() {
+        val h = HybridSource(RulesSource(), Stub(error = CancellationException("cancelled")))
+        assertThrows(CancellationException::class.java) { runBlocking { h.ask("make it warmer") } }
     }
 }

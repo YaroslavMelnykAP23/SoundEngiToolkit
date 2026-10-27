@@ -11,17 +11,17 @@
 
 | # | Вхід | Очікуваний результат | Тест | Статус |
 |---|---|---|---|---|
-| 1 | `RulesSource`: `add delay 1/8 at 120 bpm and turn on compressor` | 3 дії: `bpm=120`, `delay{on, division=8}`, `compressor{on}` | `rules_fullExample` | <pass/fail> |
-| 2 | `RulesSource`: `hello` | `{"actions":[]}` | `rules_unrecognized_isEmpty` | <pass/fail> |
-| 3 | `RulesSource`: `ділей 1/16` | `division=16` | `rules_ukrainianDelay_division16` | <pass/fail> |
-| 4 | `Ai.apply`: delay on, division 16, feedback 0.5, mix 0.2 | поля `Delay` змінено, лог починається з `✓` | `apply_delay_setsFields` | <pass/fail> |
-| 5 | `Ai.apply`: `{"fx":"foo"}` | лог `? foo`, параметри не змінені | `apply_unknownFx_isLogged` | <pass/fail> |
-| 6 | `Ai.apply`: `{"fx":"eq","low":3}` | `eq.on=true`, `low=3`, `mid=0`, `high=0` (L-04) | `apply_eqWithoutOn_enablesAndResets` | <pass/fail> |
-| 7 | `Ai.apply`: compressor без числових полів | `threshold=-18`, `ratio=4` | `apply_compressorMissingFields_resetToDefaults` | <pass/fail> |
-| 8 | `Ai.apply`: `not json` | `JSONException` | `apply_invalidJson_throws` | <pass/fail> |
-| 9 | `Ai.apply`: `[reverb on, {}]` | виняток, але `reverb.on=true` (часткове застосування) | `apply_partialOnError_firstActionStaysApplied` | <pass/fail> |
-| 10 | `HybridSource`: правила порожні, хмара кидає виняток | `{"actions":[]}`, `lastUsed="rules (cloud failed)"` | `hybrid_cloudFails_fallsBackToRules` | <pass/fail> |
-| 11 | `HybridSource`: правила розпізнали фразу | хмара не викликається, `lastUsed="rules"` | `hybrid_rulesRecognized_cloudNotNeeded` | <pass/fail> |
+| 1 | `RulesSource`: `add delay 1/8 at 120 bpm and turn on compressor` | 3 дії: `bpm=120`, `delay{on, division=8}`, `compressor{on}` | `rules_fullExample` | pass |
+| 2 | `RulesSource`: `hello` | `{"actions":[]}` | `rules_unrecognized_isEmpty` | pass |
+| 3 | `RulesSource`: `ділей 1/16` | `division=16` | `rules_ukrainianDelay_division16` | pass |
+| 4 | `Ai.apply`: delay on, division 16, feedback 0.5, mix 0.2 | поля `Delay` змінено, лог починається з `✓` | `apply_delay_setsFields` | pass |
+| 5 | `Ai.apply`: `{"fx":"foo"}` | лог `? foo`, параметри не змінені | `apply_unknownFx_isLogged` | pass |
+| 6 | `Ai.apply`: `{"fx":"eq","low":3}` | `eq.on=true`, `low=3`, `mid=0`, `high=0` (L-04) | `apply_eqWithoutOn_enablesAndResets` | pass |
+| 7 | `Ai.apply`: compressor без числових полів | `threshold=-18`, `ratio=4` | `apply_compressorMissingFields_resetToDefaults` | pass |
+| 8 | `Ai.apply`: `not json` | `JSONException` | `apply_invalidJson_throws` | pass |
+| 9 | `Ai.apply`: `[reverb on, {}]` | виняток, але `reverb.on=true` (часткове застосування) | `apply_partialOnError_firstActionStaysApplied` | pass |
+| 10 | `HybridSource`: правила порожні, хмара кидає виняток | `{"actions":[]}`, `lastUsed="rules (cloud failed)"` | `hybrid_cloudFails_fallsBackToRules` | pass |
+| 11 | `HybridSource`: правила розпізнали фразу | хмара не викликається, `lastUsed="rules"` | `hybrid_rulesRecognized_cloudNotNeeded` | pass |
 
 Команда запуску: `gradlew testDebugUnitTest`
 Результат: <N tests, N passed, N failed>. Якщо щось впало, опишіть, що саме і чому очікування довелося змінити.
@@ -52,3 +52,5 @@ UI-обробник Run не можна перевірити юніт-тесто
 | Що змінилось | Крок | Чому | Тест |
 |---|---|---|---|
 | Парсинг усіх дій перед застосуванням (немає часткового застосування) | 3 | атомарність | оновлений тест 9 |
+| CancellationException більше не вважається збоєм хмари (раніше runCatching її ковтав) | 2 | скасування корутини має пропагуватися | hybrid_cancellation_isNotSwallowed |
+| Джерело в історії береться з відповіді, а не зі стану lastUsed (раніше при помилці могло бути від попереднього запуску; тепер unknown) | 2 | прибрано прихований стан | ручний сценарій 2 |

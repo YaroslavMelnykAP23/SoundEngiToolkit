@@ -173,12 +173,17 @@ fun Screen(e: Engine) {
                 Button(onClick = {
                     scope.launch {
                         var json = ""
+                        var src = ""
                         val result = try {
-                            withContext(Dispatchers.IO) { json = Ai.ask(prompt); Ai.apply(e, json) } to true
+                            withContext(Dispatchers.IO) {
+                                val reply = Ai.ask(prompt)
+                                json = reply.json; src = reply.source
+                                Ai.apply(e, json)
+                            } to true
                         } catch (ex: Throwable) { "Error: ${ex.javaClass.simpleName}: ${ex.message}" to false }
                         log = result.first.ifBlank { "No actions recognized" }
                         sync()
-                        runCatching { store.logAi(prompt, json, result.first, Ai.lastSource(), result.second && result.first.isNotBlank()) }
+                        runCatching { store.logAi(prompt, json, result.first, src.ifEmpty { "unknown" }, result.second && result.first.isNotBlank()) }
                     }
                 }) { Text("Run") }
                 Text(log, style = MaterialTheme.typography.bodySmall)

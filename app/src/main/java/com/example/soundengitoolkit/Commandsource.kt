@@ -5,17 +5,21 @@ import com.google.firebase.ai.ai
 import com.google.firebase.ai.type.GenerativeBackend
 import com.google.firebase.ai.type.content
 import com.google.firebase.ai.type.generationConfig
+import kotlinx.coroutines.CancellationException
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** Turns a user prompt into a JSON string {"actions":[...]} for Ai.apply(). */
+/** JSON {"actions":[...]} plus the name of the source that produced it (rules, cloud, ...). */
+data class CommandReply(val json: String, val source: String)
+
+/** Turns a user prompt into a reply with JSON {"actions":[...]} for Ai.apply(). */
 interface CommandSource {
-    suspend fun ask(prompt: String): String
+    suspend fun ask(prompt: String): CommandReply
 }
 
 /** Offline, free, instant. Understands only a few fixed phrases. */
 class RulesSource : CommandSource {
-    override suspend fun ask(prompt: String): String {
+    override suspend fun ask(prompt: String): CommandReply {
         val a = JSONArray(); val s = prompt.lowercase()
         Regex("(\\d+)\\s*bpm|bpm\\s*(\\d+)").find(s)?.let {
             a.put(JSONObject().put("fx", "bpm").put("value", (it.groupValues[1] + it.groupValues[2]).toInt()))
@@ -26,15 +30,17 @@ class RulesSource : CommandSource {
         }
         if ("compress" in s || "компрес" in s) a.put(JSONObject().put("fx", "compressor").put("on", true))
         if ("reverb" in s || "ревер" in s) a.put(JSONObject().put("fx", "reverb").put("on", true))
-        return JSONObject().put("actions", a).toString()
+        return CommandReply(JSONObject().put("actions", a).toString(), "rules")
     }
 }
 
 /**
  * Gemini through Firebase AI Logic. No API key in the app;
  * enable App Check in the Firebase console to protect the quota.
+ * The system prompt is passed in, so this class does not depend on [Ai].
  */
 class FirebaseSource(
+    private val systemPrompt: String,
     // Check the current model name in Firebase AI Logic docs; names change over time.
     modelName: String = "gemini-2.5-flash"
 ) : CommandSource {
@@ -44,26 +50,27 @@ class FirebaseSource(
         Firebase.ai(backend = GenerativeBackend.googleAI()).generativeModel(
             modelName = modelName,
             generationConfig = generationConfig { responseMimeType = "application/json" },
-            systemInstruction = content { text(Ai.SYSTEM) }
+            systemInstruction = content { text(systemPrompt) }
         )
     }
 
-    override suspend fun ask(prompt: String): String {
+    override suspend fun ask(prompt: String): CommandReply {
         val text = model.generateContent(prompt).text ?: error("Empty AI response")
-        return text.replace("```json", "").replace("```", "").trim()
+        return CommandReply(text.replace("```json", "").replace("```", "").trim(), "cloud")
     }
 }
 
-/** Rules first (free, offline). If nothing recognized, fall back to the cloud model. */
+/** Rules first (free, offline). If nothing recognized, fall back to the cloud model. Stateless. */
 class HybridSource(private val rules: CommandSource, private val cloud: CommandSource) : CommandSource {
-    @Volatile var lastUsed = "rules"
-
-    override suspend fun ask(prompt: String): String {
+    override suspend fun ask(prompt: String): CommandReply {
         val r = rules.ask(prompt)
-        if (JSONObject(r).getJSONArray("actions").length() > 0) { lastUsed = "rules"; return r }
-        return runCatching { cloud.ask(prompt) }
-            .onSuccess { lastUsed = "cloud" }
-            .onFailure { lastUsed = "rules (cloud failed)" }
-            .getOrDefault(r)
+        if (JSONObject(r.json).getJSONArray("actions").length() > 0) return r
+        return try {
+            cloud.ask(prompt).copy(source = "cloud")
+        } catch (e: CancellationException) {
+            throw e                                        // cancellation is not a cloud failure
+        } catch (e: Exception) {
+            CommandReply(r.json, "rules (cloud failed)")
+        }
     }
 }
