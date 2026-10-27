@@ -57,13 +57,15 @@ D-17 (доповнення): `ViewState` має поле `owner` (посилан
 ## D-18: Library як вкладка (`TabRow`), без Navigation Compose
 Список збережених записів на окремій вкладці, щоб він не займав місце на головному екрані. `TabRow` не додає залежностей. Наслідок: L-21.
 
-## D-19: «Use case не знає Engine: повертає List<AiAction>, а ActionExecutor викликає екран (через ViewModel-колбек). Причина: Engine створюється в Activity (L-13), а ViewModel переживає поворот екрана.»
+## D-19 (реалізовано): «ViewModel не знає Engine. Дії застосовує колбек, який передає екран.»
 
 ## D-20: «Категорії помилок AiError замість рядків; типи Firebase SDK не імпортуються поза FirebaseSource. Невпізнані винятки це Unknown.»
 
 ## D-21: «Ручний DI (AppContainer у App) замість Hilt: один сценарій, три залежності, нуль нових бібліотек. Hilt пояснюється на захисті як альтернатива, що автоматизує те саме створення об'єктів.». «Параметр конструктора AppContainer названо initialUseFake, бо однойменний параметр затінював властивість в ініціалізаторі й ламав перемикач; виявлено тестом container_switchesImplementationWithoutTouchingCallers»
 
 ## D-22: «FakeCommandSource лежить у main, бо потрібен debug-перемикачу.»
+
+## D-23: «AiCommandViewModel створюється через by viewModels з фабрикою в MainActivity, залежності беруться з AppContainer. viewModel() з lifecycle-viewmodel-compose не використано, щоб не додавати залежність.»
 
 ## Відкрите рішення
 - `minSdk`: заявлено «Android 17+», але аудіофункціям вистачає API 29-30. Рекомендовано знизити; фінальне значення зафіксувати тут після перевірки `build.gradle.kts`.

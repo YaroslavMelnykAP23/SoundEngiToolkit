@@ -12,7 +12,7 @@ import org.json.JSONObject
 /** JSON {"actions":[...]} plus the name of the source that produced it (rules, cloud, ...). */
 data class CommandReply(val json: String, val source: String)
 
-/** Turns a user prompt into a reply with JSON {"actions":[...]} for Ai.apply(). */
+/** Turns a user prompt into a reply with JSON {"actions":[...]} for the action mapper. */
 interface CommandSource {
     suspend fun ask(prompt: String): CommandReply
 }
@@ -38,6 +38,7 @@ class RulesSource : CommandSource {
  * Gemini through Firebase AI Logic. No API key in the app;
  * enable App Check in the Firebase console to protect the quota.
  * The system prompt is passed in, so this class does not depend on [Ai].
+ * Firebase SDK failures are turned into [AiException] here: SDK types do not leave this class.
  */
 class FirebaseSource(
     private val systemPrompt: String,
@@ -78,6 +79,8 @@ class HybridSource(private val rules: CommandSource, private val cloud: CommandS
         } catch (e: CancellationException) {
             throw e                                        // cancellation is not a cloud failure
         } catch (e: Exception) {
+            // For diagnosing cloud failures, temporarily add here:
+            android.util.Log.w("HybridSource", "cloud failed", e)
             CommandReply(r.json, "rules (cloud failed)")
         }
     }

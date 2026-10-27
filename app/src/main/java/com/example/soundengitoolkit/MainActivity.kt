@@ -8,6 +8,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -35,19 +36,32 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.Dispatchers
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     private val engine = Engine()
+
+    // Created here (not in the screen) so the ViewModel survives rotation; dependencies come from the container.
+    private val aiVm: AiCommandViewModel by viewModels {
+        object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                val store = ProjectStore(applicationContext)
+                return AiCommandViewModel((application as App).container.runAiCommand) { p, j, l, s, ok ->
+                    store.logAi(p, j, l, s, ok)
+                } as T
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         engine.start()
         setContent {
             MaterialTheme(colorScheme = darkColorScheme()) {
-                Surface(color = Color(0xFF111111), contentColor = Color.White) { Screen(engine) }
+                Surface(color = Color(0xFF111111), contentColor = Color.White) { Screen(engine, aiVm) }
             }
         }
     }
@@ -56,20 +70,19 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun Screen(e: Engine) {
+fun Screen(e: Engine, ai: AiCommandViewModel) {
     val scope = rememberCoroutineScope()
     var rec by remember { mutableStateOf(false) }
     var bpm by remember { mutableStateOf(120f) }
     var prompt by remember { mutableStateOf("add delay 1/8 at 120 bpm and turn on compressor") }
-    var log by remember { mutableStateOf("") }
     val fxState = remember { mutableStateMapOf("EQ" to false, "Compressor" to false, "Delay" to false, "Reverb" to false) }
     var status by remember { mutableStateOf("") }
     var vol by remember { mutableFloatStateOf(0f) }
     val ctx = LocalContext.current
-    val container = (ctx.applicationContext as App).container
     val store = remember { ProjectStore(ctx) }
     val projects by store.projects.collectAsState(initial = emptyList())
     val history by store.history.collectAsState(initial = emptyList())
+    val aiState by ai.state.collectAsState()
     val vs = remember { ViewState() }                       // cursor and loop markers, kept in sync by ScopePanel
     var restore by remember { mutableStateOf<ViewState?>(null) }
     var showSave by remember { mutableStateOf(false) }
@@ -169,24 +182,19 @@ fun Screen(e: Engine) {
                     }
                 }
 
-                // AI
+                // AI: the screen only shows the state; the scenario lives in AiCommandViewModel
                 OutlinedTextField(prompt, { prompt = it }, Modifier.fillMaxWidth(), label = { Text("AI command") })
-                Button(onClick = {
-                    scope.launch {
-                        val r = container.runAiCommand(prompt)
-                        val reply = r.getOrNull()
-                        val log0 = when {
-                            reply != null -> withContext(Dispatchers.IO) { ActionExecutor.apply(e, reply.actions) }
-                            else -> "Error: " + ((r.exceptionOrNull() as? AiException)?.error ?: AiError.Unknown)
-                        }
-                        log = log0.ifBlank { "No actions recognized" }
-                        sync()
-                        runCatching {
-                            store.logAi(prompt, reply?.json ?: "", log0, reply?.source ?: "error", reply != null && log0.isNotBlank())
-                        }
-                    }
-                }) { Text("Run") }
-                Text(log, style = MaterialTheme.typography.bodySmall)
+                Button(
+                    enabled = aiState !is AiUiState.Loading,
+                    onClick = { ai.run(prompt) { actions -> ActionExecutor.apply(e, actions).also { sync() } } }
+                ) { Text(if (aiState is AiUiState.Loading) "Running..." else "Run") }
+                when (val s = aiState) {
+                    AiUiState.Idle -> {}
+                    AiUiState.Loading -> Text("Waiting for AI...", style = MaterialTheme.typography.bodySmall)
+                    is AiUiState.Success -> Text(s.log, style = MaterialTheme.typography.bodySmall)
+                    is AiUiState.Error -> Text(s.message, style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFFFF8A80))
+                }
                 HistoryPanel(history, onPick = { prompt = it }, onClear = { scope.launch { runCatching { store.clearHistory() } } })
             } else {
                 if (status.isNotEmpty()) Text(status, style = MaterialTheme.typography.bodySmall)
