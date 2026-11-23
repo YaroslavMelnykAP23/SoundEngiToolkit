@@ -38,7 +38,7 @@ compressor, EQ) і відповідає повідомленням: **що зм�
 | REQ-2 | Маршрутизація за розділом 2; часткового застосування правил для складних команд немає |
 | REQ-3 | Правила розпізнають вимкнення: `off`, `вимкни`, `disable` → `on=false` |
 | REQ-4 | У Gemini передаються поточний стан параметрів і до 3 останніх реплік чату (запит + підсумок змін) |
-| REQ-5 | Відповідь моделі — JSON за `responseSchema`: `actions[]` (кожна дія з полем `why`) і `reply` (короткий підсумок); модель `gemini-3.8-flash`, `temperature = 0.2` |
+| REQ-5 | Відповідь моделі — JSON за `responseSchema`: `actions[]` (кожна дія з полем `why`) і `reply` (короткий підсумок); модель `gemini-3.5-flash-lite`, `temperature = 0.2`, `thinkingLevel = LOW` |
 | REQ-6 | Значення обрізаються до діапазонів з `Ai.SYSTEM` (R-28); про обрізання користувач бачить попередження |
 | REQ-7 | «Що змінено» формується **локально** як різниця стану до/після (diff), а не з тексту моделі; модель дає лише «навіщо» |
 | REQ-8 | Пропущені поля `compressor`/`eq` зберігають поточні значення (виправлення L-04, потрібне для відносних команд) |
@@ -99,7 +99,7 @@ compressor, EQ) і відповідає повідомленням: **що зм�
 | Компонент | Де виконується | Чому |
 |---|---|---|
 | Правила (прості команди) | на пристрої | миттєво, безкоштовно, офлайн |
-| Gemini `gemini-3.8-flash` | зовнішній сервіс: Firebase AI Logic, виклик з клієнта, без власного backend | не потрібен сервер; ключів у коді немає; захист квоти через App Check |
+| Gemini `gemini-3.5-flash-lite` | зовнішній сервіс: Firebase AI Logic, виклик з клієнта, без власного backend | не потрібен сервер; ключів у коді немає; захист квоти через App Check |
 | Обрізання, diff, текст «що змінено» | на пристрої | детерміновано, перевіряється unit-тестами, не залежить від моделі |
 
 ### 7.2 Потік даних
@@ -199,7 +199,7 @@ Firebase BoM **не змінюються**; нових залежностей н
 
 | Крок | Що | Перевірка |
 |---|---|---|
-| 1 | `FirebaseSource`: модель, `temperature`, `responseSchema`; новий `Ai.SYSTEM` | збірка; ручний E2 |
+| 1 | `FirebaseSource`: `temperature`, `responseSchema`; новий `Ai.SYSTEM` `thinkingLevel = LOW`; модель `gemini-3.5-flash-lite` (3.8-flash → «high demand», 3.5-flash → таймаути; див. evaluation.md 1.3) | збірка; ручний E2 |
 | 2a | `AiRequest`, `CommandSource(request)`, `SimpleCommandParser`, `HybridSource`, таймаут, `Timeout` | тести маршрутизації і use case |
 | 2b | `AiReplyParser`, `ActionClamp`, `ChangeDiff`, `ExplanationBuilder`, L-04 | тести перетворення |
 | 3 | `AiChatViewModel`, `ChatUiState`, `AiChatScreen`, вкладка AI | тести ViewModel; ручні сценарії і скриншоти |

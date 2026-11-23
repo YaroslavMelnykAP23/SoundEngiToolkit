@@ -47,8 +47,28 @@ AI command → Run, зробити скриншот логу та історії
 | B-4 | Немає пояснення змін для користувача, лише технічний лог `✓ fx k=v` | `ActionExecutor.describe` | користувач не бачить, що і навіщо змінено |
 | B-5 | Значення не обмежуються діапазонами з `Ai.SYSTEM` (L-03) | `ActionExecutor.apply` | feedback ≥ 1 дає наростання звуку |
 | B-6 | Прихований збій хмари показується як Success без Retry (L-25) | `HybridSource` + `AiCommandViewModel` | користувач не знає, що команду не зрозуміли через мережу |
-| B-7 | У коді `gemini-3.5-flash`; за сторінкою моделей Firebase AI Logic (перевірено 23.11.2026) у Gemini Developer API запити до неї перенаправляються на `gemini-3.6-flash`, рекомендована заміна `gemini-3.8-flash` (Stable, без білінгу). Тобто baseline фактично працював на 3.6-flash | `FirebaseSource(modelName = ...)` | у новій версії перейти на `gemini-3.8-flash` і зафіксувати назву (REQ-5) |
+| B-7 | У коді baseline `gemini-3.5-flash`; за сторінкою моделей Firebase AI Logic (перевірено 23.11.2026) у Gemini Developer API запити до неї перенаправляються на `gemini-3.6-flash`. У новій версії обрано `gemini-3.5-flash-lite` (див. 1.3) | `FirebaseSource.MODEL` | baseline і нова версія працюють на різних моделях: це враховується при порівнянні «до/після» |
 | B-8 | Формат відповіді контролюється лише промптом (`responseMimeType`), без `responseSchema`; ` ```json ` прибирається вручну | `FirebaseSource` | модель може повернути невалідну структуру |
 | B-9 | `ai-component.md` описує fallback «UI ловить Throwable і показує в блоці логу», а після Лаби 5 помилки йдуть через `AiError` і `AiUiState.Error` | `docs/ai-component.md` | документацію треба оновити |
 | B-11 | Правила ігнорують заперечення: `off`, `вимкни`, `без` → завжди `on=true` | `RulesSource.ask`: `put("on", true)` для delay/compressor/reverb | вимкнути ефект командою неможливо (E5); `✓` у лозі вводить в оману |
+| B-12 | Тимчасове перевантаження моделі (23.11.2026 17:58, `gemini-3.8-flash`: `ServerException: This model is currently experiencing high demand`) мапиться в те саме `AiUnavailable`, що й помилка налаштування, а `HybridSource` показує його як «No actions recognized» | `FirebaseSource.ask` → `AiException(AiUnavailable)`; `HybridSource` | користувач не знає, що варто просто повторити; окрема категорія `Busy` з Retry (крок 2a) |
 | B-10 | Нерозпізнана команда і «нічого не змінилось» не відрізняються від успіху: стан «немає результату» відсутній | `AiCommandViewModel.run` → `Success("No actions recognized")` | немає окремого стану «немає придатного результату» |
+
+### 1.3 Спостереження під час Етапу 4, крок 1 (23.11.2026, команда E2 `make sound warmer`)
+
+| Час | Конфігурація | Очікування | Результат (Logcat `HybridSource`) |
+|---|---|---|---|
+| 17:15 | `gemini-3.5-flash`, без схеми, старий промпт (baseline) | кілька секунд | `cloud`: `eq on=true low=4.0 high=-4.0` |
+| 17:58 | `gemini-3.8-flash` + `responseSchema`, новий промпт | — | `ServerException: This model is currently experiencing high demand` |
+| 18:06 | `gemini-3.5-flash` + `responseSchema` | ~1 хв | `RequestTimeoutException` |
+| 18:10 | `gemini-3.5-flash` без схеми | ~1 хв | `cloud`: `eq on=true low=4.0 high=-2.0` |
+| 18:15 | `gemini-3.5-flash` + `responseSchema` + `thinkingLevel = LOW` | ~3 хв | `RequestTimeoutException` |
+| 18:17 | **`gemini-3.5-flash-lite`** + `responseSchema` + `thinkingLevel = LOW` | кілька секунд | `cloud`: <дія з логу> |
+
+Висновки:
+- Без власного таймауту користувач чекає до 3 хв (таймаут SDK) і бачить «No actions recognized»: підтверджено B-1 і B-12.
+- Схема не є причиною затримки (без неї теж ~1 хв). Причина — завантаженість `gemini-3.5-flash` (3.6-flash) у цей час:
+  `gemini-3.5-flash-lite` з тими самими схемою і промптом відповів за кілька секунд.
+- Рішення: основна модель `gemini-3.5-flash-lite` (Stable, featured, без білінгу; задача коротка, важка модель не потрібна).
+- Тому в кроці 2a: таймаут 20 с, окремі категорії `Timeout` і `Busy` з Retry. Хмарні прогони для оцінки (Етап 5)
+  повторюються, коли сервіс відповідає стабільно; час відповіді записується.

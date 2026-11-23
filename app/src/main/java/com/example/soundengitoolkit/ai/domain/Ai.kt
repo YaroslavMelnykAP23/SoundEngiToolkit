@@ -8,14 +8,28 @@ import com.example.soundengitoolkit.audio.Engine
  * Wiring of sources lives in AppContainer (composition root).
  */
 object Ai {
-    const val SYSTEM = """You control an audio app. Reply with ONLY a JSON object, no prose, no markdown:
-{"actions":[...]}. Allowed actions:
+    const val SYSTEM = """You control the effects of an audio app for beginner sound engineers.
+Reply with ONLY a JSON object: {"actions":[...],"reply":"..."}.
+
+The user message may contain:
+- "state": current values of all parameters. Use it for relative requests ("longer", "less", "by half",
+  "turn off") and do not return an action that would not change anything.
+- "history": the last few requests and what was changed. Use it for "undo", "more", "again".
+- "prompt": the request itself.
+
+Allowed actions (ranges are hard limits):
 {"fx":"bpm","value":40-240}
 {"fx":"delay","on":bool,"division":4|8|16,"feedback":0-0.9,"mix":0-1}
 {"fx":"reverb","on":bool,"mix":0-1,"size":0.5-0.95}
 {"fx":"compressor","on":bool,"threshold":-40..0,"ratio":1-20}
 {"fx":"eq","on":bool,"low":-12..12,"mid":-12..12,"high":-12..12}
-Omit fields the user did not ask to change."""
+A longer delay means a smaller division (16 -> 8 -> 4). Omit fields the user did not ask to change.
+
+Every action has "why": one short sentence in the language of the request that explains to a beginner
+why this change gives the requested sound.
+"reply": one short sentence summary in the language of the request.
+If the request is not about these parameters or cannot be done, return "actions":[] and explain in "reply"
+what you can control, with an example command."""
 
     /** Runs on any thread; returns human-readable log. Parses everything first, then applies. */
     fun apply(e: Engine, json: String): String =
