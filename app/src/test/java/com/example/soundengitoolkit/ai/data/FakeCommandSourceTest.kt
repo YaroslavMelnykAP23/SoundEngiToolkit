@@ -6,19 +6,23 @@ import org.junit.Test
 import com.example.soundengitoolkit.ai.domain.AiAction
 import com.example.soundengitoolkit.ai.domain.AiError
 import com.example.soundengitoolkit.ai.domain.AiException
-import com.example.soundengitoolkit.ai.domain.AiReply
-import com.example.soundengitoolkit.ai.domain.RunAiCommandUseCase
+import com.example.soundengitoolkit.ai.domain.AiPlan
+import com.example.soundengitoolkit.ai.domain.FxSnapshot
+import com.example.soundengitoolkit.ai.domain.RunAiChatUseCase
+import com.example.soundengitoolkit.audio.Engine
 import com.example.soundengitoolkit.di.AppContainer
 
 class FakeCommandSourceTest {
-    private fun run(mode: FakeCommandSource.Mode, prompt: String = "x") =
-        runBlocking { RunAiCommandUseCase(FakeCommandSource(mode))(prompt) }
+    private val state = FxSnapshot.from(Engine())
 
-    private fun errorOf(r: Result<AiReply>) = (r.exceptionOrNull() as AiException).error
+    private fun run(mode: FakeCommandSource.Mode, prompt: String = "x") =
+        runBlocking { RunAiChatUseCase(FakeCommandSource(mode))(prompt, state, emptyList()) }
+
+    private fun errorOf(r: Result<AiPlan>) = (r.exceptionOrNull() as AiException).error
 
     @Test fun success_returnsReverbAction() {
         val r = run(FakeCommandSource.Mode.SUCCESS).getOrThrow()
-        assertEquals(listOf<AiAction>(AiAction.ReverbFx(true, null, null)), r.actions)
+        assertEquals(AiAction.ReverbFx(true, null, null), r.actions[0].action)
         assertEquals("fake", r.source)
     }
 
@@ -30,8 +34,8 @@ class FakeCommandSourceTest {
 
     @Test fun container_switchesImplementationWithoutTouchingCallers() = runBlocking {
         val c = AppContainer(initialUseFake = true)
-        assertEquals("fake", c.runAiCommand("x").getOrThrow().source)
+        assertEquals("fake", c.runAiChat("x", state, emptyList()).getOrThrow().source)
         c.useFake = false
-        assertEquals("rules", c.runAiCommand("reverb").getOrThrow().source)
+        assertEquals("rules", c.runAiChat("reverb", state, emptyList()).getOrThrow().source)
     }
 }

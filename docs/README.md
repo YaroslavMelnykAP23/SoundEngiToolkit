@@ -78,7 +78,7 @@ Windows: `gradlew` замість `./gradlew`.
 і відповідає, **що змінено** (було → стало, рахується на пристрої) і **навіщо** (пояснення моделі). Моделі передається
 поточний стан, тому працюють відносні команди («зроби delay довшим», «зменш reverb наполовину») і вимкнення
 (`reverb off`). Результат на 5 контрольних прикладах: намір 2/5 → 5/5, пояснень 0/5 → 5/5 ([evaluation.md](evaluation.md)).
-Попередній сценарій (поле AI command на Studio) збережено.
+Попередній сценарій (поле AI command на Studio) на момент здачі збережено (тег `lab6-final`); після здачі його прибрано, бо чат його повністю замінює.
 
 **Модель і доступ:**
 
@@ -97,7 +97,7 @@ Windows: `gradlew` замість `./gradlew`.
 3. App Check: запустити debug-збірку, скопіювати debug token з Logcat (тег `DebugAppCheckProvider`) →
    App Check → Apps → Manage debug tokens → додати.
 4. `./gradlew assembleDebug` → Run на пристрої → вкладка **AI**.
-5. Тести (без мережі й ключів): `./gradlew testDebugUnitTest` — 133 тести.
+5. Тести (без мережі й ключів): `./gradlew testDebugUnitTest` (133 тести на `lab6-final`).
 6. Ручні сценарії і контрольні приклади E1–E5: [evaluation.md](evaluation.md), розділ 5.
 7. Перед commit: `git diff` — без `google-services.json`, ключів і debug token.
 

@@ -17,7 +17,7 @@
 | R-09 | Reverb (Schroeder/Freeverb) | Partial | `Reverb`; параметри лише через AI |
 | R-10 | Перемикачі ефектів у інтерфейсі | Done | `Screen` |
 | R-11 | Master volume у дБ (−60…+12, −60 = mute) | Done | `Engine.masterDb` |
-| R-12 | Осцилограф: Recording (весь сигнал за замовчуванням, зум, зсув) і Live | Done | `ScopePanel`, `Engine.scope` |
+| R-12 | Осцилограф: весь запис за замовчуванням, зум (повзунок і щипок), зсув; режим Live прибрано після Лаби 6 | Done | `ScopePanel`, `Engine.scope` |
 | R-13 | Пік і RMS у dBFS, лінійна вісь, View gain 0…40 дБ | Done | `Engine.levels`, `columns()` |
 | R-14 | AI-команди → JSON-дії → зміна параметрів | Done | `Ai.apply`, `CommandSource` |
 | R-15 | Правила як офлайн-fallback для AI | Done | `RulesSource`, `HybridSource` |

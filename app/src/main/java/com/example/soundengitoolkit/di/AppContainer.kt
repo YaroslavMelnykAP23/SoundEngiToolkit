@@ -9,7 +9,6 @@ import com.example.soundengitoolkit.ai.data.HybridSource
 import com.example.soundengitoolkit.ai.data.RulesSource
 import com.example.soundengitoolkit.ai.domain.Ai
 import com.example.soundengitoolkit.ai.domain.RunAiChatUseCase
-import com.example.soundengitoolkit.ai.domain.RunAiCommandUseCase
 
 /** The only place where concrete implementations are chosen and wired. */
 class AppContainer(initialUseFake: Boolean = false) {
@@ -26,8 +25,6 @@ class AppContainer(initialUseFake: Boolean = false) {
             (if (this@AppContainer.useFake) fakeSource else realSource).ask(request)
     }
 
-    val runAiCommand = RunAiCommandUseCase(commandSource)
-
-    /** AI chat (lab 6): same sources and routing, plus state, history and explanations. */
+    /** AI chat: rules for simple commands, Gemini for the rest, with state, history and explanations. */
     val runAiChat = RunAiChatUseCase(commandSource)
 }

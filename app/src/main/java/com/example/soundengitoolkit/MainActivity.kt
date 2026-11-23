@@ -34,6 +34,8 @@ import androidx.core.content.ContextCompat
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -43,8 +45,6 @@ import com.example.soundengitoolkit.ai.domain.AiAction
 import com.example.soundengitoolkit.ai.domain.FxSnapshot
 import com.example.soundengitoolkit.ai.ui.AiChatScreen
 import com.example.soundengitoolkit.ai.ui.AiChatViewModel
-import com.example.soundengitoolkit.ai.ui.AiCommandViewModel
-import com.example.soundengitoolkit.ai.ui.AiUiState
 import com.example.soundengitoolkit.audio.Engine
 import com.example.soundengitoolkit.audio.SR
 import com.example.soundengitoolkit.data.ProjectStore
@@ -57,20 +57,7 @@ import com.example.soundengitoolkit.ui.library.defaultProjectName
 class MainActivity : ComponentActivity() {
     private val engine = Engine()
 
-    // Created here (not in the screen) so the ViewModel survives rotation; dependencies come from the container.
-    private val aiVm: AiCommandViewModel by viewModels {
-        object : ViewModelProvider.Factory {
-            @Suppress("UNCHECKED_CAST")
-            override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                val store = ProjectStore(applicationContext)
-                return AiCommandViewModel((application as App).container.runAiCommand) { p, j, l, s, ok ->
-                    store.logAi(p, j, l, s, ok)
-                } as T
-            }
-        }
-    }
-
-    // AI chat (lab 6): same container and history store; the Engine is passed per call, not held by the ViewModel.
+    // AI chat: created here (not in the screen) so it survives rotation; the Engine is passed per call, not held.
     private val chatVm: AiChatViewModel by viewModels {
         object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
@@ -88,7 +75,7 @@ class MainActivity : ComponentActivity() {
         engine.start()
         setContent {
             MaterialTheme(colorScheme = darkColorScheme()) {
-                Surface(color = Color(0xFF111111), contentColor = Color.White) { Screen(engine, aiVm, chatVm) }
+                Surface(color = Color(0xFF111111), contentColor = Color.White) { Screen(engine, chatVm) }
             }
         }
     }
@@ -96,12 +83,21 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() { engine.stop(); super.onDestroy() }
 }
 
+/** Icon-only button content: the symbol is shown, [description] is what TalkBack reads instead of the symbol. */
 @Composable
-fun Screen(e: Engine, ai: AiCommandViewModel, chat: AiChatViewModel) {
+private fun Glyph(symbol: String, description: String) =
+    Text(symbol, Modifier.semantics { contentDescription = description }, style = MaterialTheme.typography.titleLarge)
+
+/** Tab positions in the TabRow, left to right. The selected index must match the position. */
+private const val TAB_STUDIO = 0
+private const val TAB_AI = 1
+private const val TAB_LIBRARY = 2
+
+@Composable
+fun Screen(e: Engine, chat: AiChatViewModel) {
     val scope = rememberCoroutineScope()
     var rec by remember { mutableStateOf(false) }
     var bpm by remember { mutableStateOf(120f) }
-    var prompt by remember { mutableStateOf("add delay 1/8 at 120 bpm and turn on compressor") }
     val fxState = remember { mutableStateMapOf("EQ" to false, "Compressor" to false, "Delay" to false, "Reverb" to false) }
     var status by remember { mutableStateOf("") }
     var vol by remember { mutableFloatStateOf(0f) }
@@ -109,12 +105,11 @@ fun Screen(e: Engine, ai: AiCommandViewModel, chat: AiChatViewModel) {
     val store = remember { ProjectStore(ctx) }
     val projects by store.projects.collectAsState(initial = emptyList())
     val history by store.history.collectAsState(initial = emptyList())
-    val aiState by ai.state.collectAsState()
     val chatState by chat.state.collectAsState()
     val vs = remember { ViewState() }                       // cursor and loop markers, kept in sync by ScopePanel
     var restore by remember { mutableStateOf<ViewState?>(null) }
     var showSave by remember { mutableStateOf(false) }
-    var tab by rememberSaveable { mutableIntStateOf(0) }    // 0 = Studio, 1 = Library, 2 = AI chat
+    var tab by rememberSaveable { mutableIntStateOf(TAB_STUDIO) }   // index = position in the TabRow
     val studioScroll = rememberScrollState()
     val libraryScroll = rememberScrollState()
 
@@ -134,7 +129,6 @@ fun Screen(e: Engine, ai: AiCommandViewModel, chat: AiChatViewModel) {
         fxState["Delay"] = e.delay.on; fxState["Reverb"] = e.reverb.on; bpm = e.bpm
     }
 
-    val applyActions: (List<AiAction>) -> String = { actions -> ActionExecutor.apply(e, actions).also { sync() } }
     val readFx: () -> FxSnapshot = { FxSnapshot.from(e) }
     val applyChat: (List<AiAction>) -> Unit = { actions -> ActionExecutor.apply(e, actions); sync() }
 
@@ -142,23 +136,26 @@ fun Screen(e: Engine, ai: AiCommandViewModel, chat: AiChatViewModel) {
         Text("SoundEngiToolkit", Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 8.dp),
             style = MaterialTheme.typography.titleLarge)
         TabRow(selectedTabIndex = tab) {
-            Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Studio") })
-            Tab(selected = tab == 1,
-                onClick = { if (rec) status = "Stop recording first" else tab = 1 },
+            Tab(selected = tab == TAB_STUDIO, onClick = { tab = TAB_STUDIO }, text = { Text("Studio") })
+            Tab(selected = tab == TAB_AI, onClick = { tab = TAB_AI }, text = { Text("AI") })
+            Tab(selected = tab == TAB_LIBRARY,
+                onClick = { if (rec) status = "Stop recording first" else tab = TAB_LIBRARY },
                 text = { Text("Library (${projects.size})") })
-            Tab(selected = tab == 2, onClick = { tab = 2 }, text = { Text("AI") })
         }
 
         // The chat has its own scrolling list, so it is not placed inside the scrolling column below.
-        if (tab == 2) AiChatScreen(
+        if (tab == TAB_AI) AiChatScreen(
             chatState,
             onSend = { chat.send(it, readFx, applyChat) },
             onRetry = { chat.retry(readFx, applyChat) },
+            history = { pick ->
+                HistoryPanel(history, onPick = pick, onClear = { scope.launch { runCatching { store.clearHistory() } } })
+            },
             modifier = Modifier.weight(1f)
         )
-        else Column(Modifier.weight(1f).verticalScroll(if (tab == 0) studioScroll else libraryScroll).padding(16.dp),
+        else Column(Modifier.weight(1f).verticalScroll(if (tab == TAB_STUDIO) studioScroll else libraryScroll).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (tab == 0) {
+            if (tab == TAB_STUDIO) {
                 // Master volume: really changes what you hear (unlike the oscilloscope view gain)
                 Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -167,23 +164,22 @@ fun Screen(e: Engine, ai: AiCommandViewModel, chat: AiChatViewModel) {
                     Slider(vol, { vol = it; e.masterDb = it }, Modifier.weight(1f), valueRange = -60f..12f)
                 }
 
-                // Sampler
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Sampler: Record and Save go into the same row as Play / Stop (inside ScopePanel)
+                ScopePanel(e, bpm, vs, restore, controls = {
                     Button(onClick = {
                         if (rec) { e.stopRecording(); rec = false; status = "Processing..." }
                         else if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO)
                             == PackageManager.PERMISSION_GRANTED) begin()
                         else perm.launch(Manifest.permission.RECORD_AUDIO)
-                    }) { Text(if (rec) "■ Stop" else "● Record") }
+                    }) { Glyph(if (rec) "■" else "●", if (rec) "Stop recording" else "Record") }
                     Button(onClick = {
                         when {
                             rec -> status = "Stop recording first"
                             e.sampler.data.isEmpty() -> status = "Nothing to save: record something first"
                             else -> showSave = true
                         }
-                    }) { Text("Save") }
-                }
-                ScopePanel(e, bpm, vs, restore) { restore = null }
+                    }) { Glyph("💾", "Save") }
+                }) { restore = null }
                 if (status.isNotEmpty()) Text(status, style = MaterialTheme.typography.bodySmall)
 
                 if (showSave) SaveDialog(
@@ -212,22 +208,6 @@ fun Screen(e: Engine, ai: AiCommandViewModel, chat: AiChatViewModel) {
                     }
                 }
 
-                // AI: the screen only shows the state; the scenario lives in AiCommandViewModel
-                OutlinedTextField(prompt, { prompt = it }, Modifier.fillMaxWidth(), label = { Text("AI command") })
-                Button(
-                    enabled = aiState !is AiUiState.Loading,
-                    onClick = { ai.run(prompt, applyActions) }
-                ) { Text(if (aiState is AiUiState.Loading) "Running..." else "Run") }
-                when (val s = aiState) {
-                    AiUiState.Idle -> {}
-                    AiUiState.Loading -> Text("Waiting for AI...", style = MaterialTheme.typography.bodySmall)
-                    is AiUiState.Success -> Text(s.log, style = MaterialTheme.typography.bodySmall)
-                    is AiUiState.Error -> {
-                        Text(s.message, style = MaterialTheme.typography.bodySmall, color = Color(0xFFFF8A80))
-                        if (s.retryable) OutlinedButton(onClick = { ai.retry(applyActions) }) { Text("Retry") }
-                    }
-                }
-                HistoryPanel(history, onPick = { prompt = it }, onClear = { scope.launch { runCatching { store.clearHistory() } } })
             } else {
                 if (status.isNotEmpty()) Text(status, style = MaterialTheme.typography.bodySmall)
                 ProjectsPanel(
@@ -238,7 +218,7 @@ fun Screen(e: Engine, ai: AiCommandViewModel, chat: AiChatViewModel) {
                             status = try {
                                 restore = ViewState(p.cursorPos, p.loopA, p.loopB, p.loopOn)   // before the data changes
                                 store.load(p, e); sync()
-                                tab = 0                                                          // show the loaded recording
+                                tab = TAB_STUDIO                                                 // show the loaded recording
                                 "Loaded: ${p.name}"
                             } catch (ex: Exception) { restore = null; "Load failed: ${ex.message}" }
                         }
@@ -277,17 +257,18 @@ private fun columns(d: FloatArray, start: Float, len: Float, w: Int): Cols {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ScopePanel(e: Engine, bpm: Float, vs: ViewState, restore: ViewState?, onRestored: () -> Unit) {
+fun ScopePanel(
+    e: Engine, bpm: Float, vs: ViewState, restore: ViewState?,
+    controls: @Composable RowScope.() -> Unit = {},     // extra buttons after Play / Stop (Record, Save)
+    onRestored: () -> Unit
+) {
     val bpmU = rememberUpdatedState(bpm)
     val restoreU = rememberUpdatedState(restore)
-    var live by remember { mutableStateOf(false) }            // false = whole recording, true = live output
     var viewGainDb by remember { mutableFloatStateOf(0f) }    // display only, does not change the sound
     var data by remember { mutableStateOf(e.sampler.data) }
     var vStart by remember { mutableFloatStateOf(0f) }        // first visible sample
     var vLen by remember { mutableFloatStateOf(max(1f, e.sampler.data.size.toFloat())) } // whole signal
-    var liveMs by remember { mutableFloatStateOf(25f) }
     var wPx by remember { mutableIntStateOf(0) }
-    var tick by remember { mutableIntStateOf(0) }
     val d0 = e.sampler.data
     // Panel may be re-created (tab switch): continue from the saved state, or from a just-loaded project.
     val seed = remember { restore ?: vs.takeIf { it.owner === d0 } }
@@ -299,9 +280,6 @@ fun ScopePanel(e: Engine, bpm: Float, vs: ViewState, restore: ViewState?, onRest
     var loopOn by remember { mutableStateOf(seed?.loopOn ?: false) }
     var snap by remember { mutableStateOf(false) }
     var playPos by remember { mutableIntStateOf(-1) }
-    val pts = remember { FloatArray(1024) }
-    val cnt = remember { IntArray(1) }
-    val lv = remember { FloatArray(2) }
     val minLen = 32f
 
     fun total() = max(1f, data.size.toFloat())
@@ -338,30 +316,23 @@ fun ScopePanel(e: Engine, bpm: Float, vs: ViewState, restore: ViewState?, onRest
     LaunchedEffect(loopA, loopB, loopOn) {
         e.sampler.loopStart = loopA; e.sampler.loopEnd = loopB; e.sampler.loopOn = loopOn
     }
-    LaunchedEffect(live, liveMs) {
+    LaunchedEffect(Unit) {                                   // playback position, once per frame
         while (true) {
             withFrameNanos { }
-            if (live) { cnt[0] = e.scope(pts, (liveMs * SR / 1000f).toInt()); e.levels(lv); tick++ }
-            else playPos = if (e.sampler.playing) e.sampler.pos else -1
+            playPos = if (e.sampler.playing) e.sampler.pos else -1
         }
     }
-    val cols = remember(data, vStart, vLen, wPx, live) {
-        if (live || wPx <= 0 || data.isEmpty()) null else columns(data, vStart, vLen, wPx)
+    val cols = remember(data, vStart, vLen, wPx) {
+        if (wPx <= 0 || data.isEmpty()) null else columns(data, vStart, vLen, wPx)
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            FilterChip(selected = !live, onClick = { live = false }, label = { Text("Recording") })
-            FilterChip(selected = live, onClick = { live = true }, label = { Text("Live") })
-            if (!live) OutlinedButton(onClick = { fit() }) { Text("Fit all") }
-        }
-
-        if (!live) {
+        run {
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { e.sampler.play(cursor) }, enabled = data.isNotEmpty()) { Text("▶ Play from cursor") }
-                Button(onClick = { e.sampler.stop() }) { Text("■") }
+                Button(onClick = { e.sampler.play(cursor) }, enabled = data.isNotEmpty()) { Glyph("▶", "Play from cursor") }
+                Button(onClick = { e.sampler.stop() }) { Glyph("■", "Stop playback") }
+                controls()
             }
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -371,14 +342,7 @@ fun ScopePanel(e: Engine, bpm: Float, vs: ViewState, restore: ViewState?, onRest
             }
         }
 
-        if (live) {
-            val t = (ln(liveMs / 2f) / ln(45f)).coerceIn(0f, 1f)
-            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Window %.0f ms".format(liveMs), Modifier.width(120.dp), style = MaterialTheme.typography.bodySmall)
-                Slider(t, { liveMs = 2f * 45f.pow(it) }, Modifier.weight(1f))
-            }
-        } else {
+        run {                                               // zoom slider: far left = whole recording
             val minL = min(minLen, total())
             val canZoom = total() > minL * 1.01f
             val t = if (canZoom) (ln(total() / vLen) / ln(total() / minL)).coerceIn(0f, 1f) else 0f
@@ -398,8 +362,8 @@ fun ScopePanel(e: Engine, bpm: Float, vs: ViewState, restore: ViewState?, onRest
         Canvas(
             Modifier.fillMaxWidth().height(200.dp).background(Color(0xFF0A1A0A))
                 .onSizeChanged { wPx = it.width }
-                .pointerInput(live, data) {
-                    if (live || data.isEmpty()) return@pointerInput
+                .pointerInput(data) {
+                    if (data.isEmpty()) return@pointerInput
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
                         val w = size.width.toFloat()
@@ -440,7 +404,6 @@ fun ScopePanel(e: Engine, bpm: Float, vs: ViewState, restore: ViewState?, onRest
                     }
                 }
         ) {
-            if (tick < 0) return@Canvas
             val mid = size.height / 2
             val g = 10f.pow(viewGainDb / 20f)
             fun amp(db: Float): Float = 10f.pow((db + viewGainDb) / 20f).coerceIn(0f, 1f)
@@ -455,19 +418,6 @@ fun ScopePanel(e: Engine, bpm: Float, vs: ViewState, restore: ViewState?, onRest
                     drawLine(grid, Offset(0f, yOf(a)), Offset(size.width, yOf(a)))
                     drawLine(grid, Offset(0f, yOf(-a)), Offset(size.width, yOf(-a)))
                 }
-            }
-
-            if (live) {
-                for (i in 1..3) drawLine(grid, Offset(size.width * i / 4, 0f), Offset(size.width * i / 4, size.height))
-                val n = cnt[0]
-                if (n < 2) return@Canvas
-                val path = Path()
-                for (i in 0 until n) {
-                    val x = size.width * i / (n - 1); val y = yOf(mapV(pts[i]))
-                    if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
-                }
-                drawPath(path, wave, style = Stroke(width = 2f))
-                return@Canvas
             }
 
             // beat / bar grid (4/4), depends on BPM; thinned out when zoomed far out
@@ -525,18 +475,16 @@ fun ScopePanel(e: Engine, bpm: Float, vs: ViewState, restore: ViewState?, onRest
             }
         }
 
-        val info = if (live) "Peak %.1f dBFS    RMS %.1f dBFS".format(lv[0], lv[1])
-        else if (data.isEmpty()) "No recording yet: press Record, or switch to Live"
+        val info = if (data.isEmpty()) "No recording yet: press Record"
         else {
             val beats = cursor / (SR * 60f / bpm)
             "View %.2f-%.2f s of %.2f s    Peak %.1f dBFS    RMS %.1f dBFS\nCursor %.2f s (bar %d, beat %d)    Loop %.2f-%.2f s".format(
                 vStart / SR, (vStart + vLen) / SR, data.size / SR, cols?.peakDb ?: -120f, cols?.rmsDb ?: -120f,
                 cursor / SR, beats.toInt() / 4 + 1, beats.toInt() % 4 + 1, loopA / SR, loopB / SR)
         }
-        Text(if (tick < 0) "" else info, style = MaterialTheme.typography.bodySmall)
+        Text(info, style = MaterialTheme.typography.bodySmall)
         Text(
-            if (live) "Grid: 0, -6, -12, -24, -48 dBFS above and below centre."
-            else "Tap: cursor (blue). Drag orange markers: loop A-B. Pinch/drag: zoom and move. " +
+            "Tap: cursor (blue). Drag orange markers: loop A-B. Pinch/drag: zoom and move. " +
                     "White lines: bars, dim lines: beats (4/4, %.0f BPM).".format(bpm),
             style = MaterialTheme.typography.labelSmall, color = Color(0xFFAAAAAA)
         )

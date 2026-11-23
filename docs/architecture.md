@@ -117,7 +117,7 @@ flowchart TB
 
 Backend: окремого сервера немає. Хмарні функції заплановані через Firebase (див. [decisions.md](decisions.md)).
 
-Інтерфейс має три вкладки (`TabRow`): **Studio** (запис, осцилограф, клавіші, ефекти, AI-команди, кнопка Save), **Library** (список збережених записів з Load і Delete) і **AI** (чат, Лаба 6: `AiChatScreen` з власним `LazyColumn`, тому рендериться поза прокручуваною колонкою Studio/Library). Після Load додаток повертається на Studio. Під час запису перехід на Library заблоковано.
+Інтерфейс має три вкладки (`TabRow`): **Studio** (запис, осцилограф, ефекти, кнопка Save), **Library** (список збережених записів з Load і Delete) і **AI** (чат і AI history; `AiChatScreen` з власним `LazyColumn`, тому рендериться поза прокручуваною колонкою Studio/Library). Старе поле AI command на Studio прибрано після Лаби 6 (тег `lab6-final`). Після Load додаток повертається на Studio. Під час запису перехід на Library заблоковано.
 
 ## Рефакторинг сценарію «AI-команда» (лаб. 5): до і після
 
@@ -169,7 +169,7 @@ AiChatViewModel (main): before = FxSnapshot → ActionExecutor.apply → after =
 1. **UI-потік (Compose)** малює екран і обробляє дотики.
 2. **`audio-out`** цикл по 256 семплів: обнулення буфера → синтезатор і семплер → ефекти (якщо ввімкнені) → master volume → обрізання до ±1 → запис у `scopeBuf` → `AudioTrack.write`.
 3. **`audio-in`** читає `AudioRecord`, збирає шматки в пам'ять; після зупинки нормалізує і передає в `Sampler.load`.
-4. **Корутина** (`viewModelScope` в `AiCommandViewModel` і `AiChatViewModel`) виконує `RunAiCommandUseCase` / `RunAiChatUseCase`, коли користувач натискає Run або Retry (мережевий виклик suspend і не блокує UI-потік), а також усі операції з файлами та базою (`ProjectStore`, `Dispatchers.IO`).
+4. **Корутина** (`viewModelScope` в `AiChatViewModel`) виконує `RunAiChatUseCase`, коли користувач натискає Run або Retry (мережевий виклик suspend і не блокує UI-потік), а також усі операції з файлами та базою (`ProjectStore`, `Dispatchers.IO`).
 
 Потоки обмінюються даними через поля `@Volatile` без блокувань. В аудіопотоці не можна виділяти пам'ять, блокуватися або викликати мережу.
 
@@ -177,9 +177,9 @@ AiChatViewModel (main): before = FxSnapshot → ActionExecutor.apply → after =
 
 **Запис і відтворення:** мікрофон → `audio-in` → `Sampler.data` → UI читає той самий масив для малювання; `audio-out` читає його ж під час відтворення.
 
-**Осцилограф Live:** `audio-out` пише вихід у кільцевий буфер (8192 семпли) → `Engine.scope` вирівнює по переходу через нуль → UI малює лінію.
+**Осцилограф:** показує весь запис (`Sampler.data`) з курсором, loop-маркерами й сіткою бітів. Режим Live прибрано з UI після Лаби 6; `audio-out` і далі пише вихід у кільцевий буфер, а `Engine.scope`/`levels` лишились у коді без використання (D-12).
 
-**AI-команда:** текст → `AiCommandViewModel.run` (стан Loading, повторні Run ігноруються) → `RunAiCommandUseCase` (перевірка на порожній ввід) → `AiCall` (таймаут 20 с) → `CommandSource` з `AppContainer` (`HybridSource`: прості команди правилами, інакше Gemini; помилки хмари не ховаються; або `FakeCommandSource`) → `CommandReply(json, source)` → `AiActionMapper` → `List<AiAction>` → `AiReply`. ViewModel викликає колбек екрана, який запускає `ActionExecutor` (змінює поля ефектів) і синхронізує перемикачі; `audio-out` бачить нові значення на наступному блоці. Результат це `AiUiState.Success`. Будь-який збій перетворюється на `AiError` (без stack trace) і `AiUiState.Error`; для помилок, окрім `InvalidInput`, екран показує Retry, що повторює збережений запит. `CancellationException` пропускається далі.
+**AI-чат:** див. розділ «AI-чат (лаб. 6): компоненти і потік даних» вище. До прибрання старого поля AI command його сценарій ішов через `AiCommandViewModel` → `RunAiCommandUseCase` → той самий `HybridSource` (тег `lab6-final`).
 
 **Збереження:** Save → `ProjectStore.save` (IO): `sampler.data` → WAV `filesDir/projects/<uuid>.wav` (спершу `.tmp`, потім перейменування) → запис у Room з BPM, курсором, маркерами та JSON ефектів. Load → читання WAV → `e.bpm`, `FxState.apply`, `sampler.load` → `ScopePanel` бачить новий масив і відновлює курсор та маркери зі `ViewState`. Зберігається сухий запис, а не результат з ефектами.
 

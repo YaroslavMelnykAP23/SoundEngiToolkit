@@ -6,9 +6,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -39,13 +42,17 @@ private val Muted = Color(0xFFB0B0B8)
 private val Warn = Color(0xFFFFCC80)
 private val ErrorText = Color(0xFFFF8A80)
 
-/** The "AI" tab: messages, input, Send, Retry. Shows the state only; the scenario lives in [AiChatViewModel]. */
+/**
+ * The "AI" tab: messages, AI history, input, Send, Retry. Shows the state only; the scenario lives in [AiChatViewModel].
+ * [history] is a slot for the saved AI history (data layer); tapping an entry puts its prompt into the input.
+ */
 @Composable
 fun AiChatScreen(
     state: ChatUiState,
     onSend: (String) -> Unit,
     onRetry: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    history: @Composable (onPick: (String) -> Unit) -> Unit = {}
 ) {
     var text by rememberSaveable { mutableStateOf("") }
     val list = rememberLazyListState()
@@ -70,6 +77,9 @@ fun AiChatScreen(
                     Text("AI is thinking…", color = Muted, style = MaterialTheme.typography.bodySmall)
                 }
             }
+        }
+        Box(Modifier.fillMaxWidth().heightIn(max = 220.dp).verticalScroll(rememberScrollState())) {
+            history { text = it }
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
