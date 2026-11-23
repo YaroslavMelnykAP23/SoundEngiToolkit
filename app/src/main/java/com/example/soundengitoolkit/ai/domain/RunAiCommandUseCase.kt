@@ -21,7 +21,8 @@ class RunAiCommandUseCase(
         }
         return try {
             val reply = AiCall.ask(source, request, timeoutMs)
-            Result.success(AiReply(AiActionMapper.parse(reply.json), reply.json, reply.source))
+            // Same range limits as the chat (R-28): the old block must not set feedback 1.5 either.
+            Result.success(AiReply(ActionClamp.clampActions(AiActionMapper.parse(reply.json)), reply.json, reply.source))
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {

@@ -16,11 +16,15 @@ object ActionExecutor {
                 is AiAction.ReverbFx -> e.reverb.apply {
                     on = a.on ?: on; mix = a.mix ?: mix; size = a.size ?: size
                 }
+                // Lab 6 (REQ-8, L-04 fixed): missing fields keep the CURRENT values, so "a bit more bass" does not
+                // reset mid/high or the compressor settings.
                 is AiAction.CompressorFx -> e.comp.apply {
-                    on = a.on ?: on; set(a.threshold ?: -18f, a.ratio ?: 4f)   // L-04
+                    on = a.on ?: on; set(a.threshold ?: thr, a.ratio ?: ratio)
                 }
                 is AiAction.EqFx -> e.eq.apply {
-                    on = a.on ?: true; set(a.low ?: 0f, a.mid ?: 0f, a.high ?: 0f)   // L-04
+                    val bandsGiven = a.low != null || a.mid != null || a.high != null
+                    on = a.on ?: (bandsGiven || on)          // changing a band without "on" still enables EQ
+                    set(a.low ?: lowDb, a.mid ?: midDb, a.high ?: highDb)
                 }
                 is AiAction.Unknown -> { log.append("? ${a.fx}\n"); continue }
             }

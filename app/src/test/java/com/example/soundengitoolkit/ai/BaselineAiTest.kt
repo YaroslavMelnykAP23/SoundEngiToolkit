@@ -59,16 +59,20 @@ class BaselineAiTest {
         assertEquals("? foo\n", Ai.apply(Engine(), """{"actions":[{"fx":"foo"}]}"""))
     }
 
-    @Test fun apply_eqWithoutOn_enablesAndResets() {          // L-04
-        val e = Engine()
+    // Deliberate change, lab 6 step 2b (REQ-8, L-04 fixed; was apply_eqWithoutOn_enablesAndResets):
+    // a band without "on" still enables EQ, but other bands keep their current values.
+    @Test fun apply_eqWithoutOn_enablesAndKeepsOtherBands() {
+        val e = Engine(); e.eq.set(0f, -2f, 5f)
         Ai.apply(e, """{"actions":[{"fx":"eq","low":3}]}""")
-        assertTrue(e.eq.on); assertEquals(3f, e.eq.lowDb, 1e-6f); assertEquals(0f, e.eq.midDb, 1e-6f)
+        assertTrue(e.eq.on); assertEquals(3f, e.eq.lowDb, 1e-6f)
+        assertEquals(-2f, e.eq.midDb, 1e-6f); assertEquals(5f, e.eq.highDb, 1e-6f)
     }
 
-    @Test fun apply_compressorMissingFields_resetToDefaults() {
+    // Deliberate change, lab 6 step 2b (REQ-8; was apply_compressorMissingFields_resetToDefaults)
+    @Test fun apply_compressorMissingFields_keepCurrent() {
         val e = Engine(); e.comp.set(-30f, 8f)
         Ai.apply(e, """{"actions":[{"fx":"compressor","on":true}]}""")
-        assertEquals(-18f, e.comp.thr, 1e-6f); assertEquals(4f, e.comp.ratio, 1e-6f)
+        assertEquals(-30f, e.comp.thr, 1e-6f); assertEquals(8f, e.comp.ratio, 1e-6f)
     }
 
     @Test fun apply_invalidJson_throws() {
