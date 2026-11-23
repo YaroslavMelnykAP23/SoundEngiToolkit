@@ -10,7 +10,7 @@
 | R-02 | Відтворення запису з курсора, зупинка | Done | `Sampler.play/stop`, `ScopePanel` |
 | R-03 | Loop A-B із перетягуваними маркерами (мін. відстань 64 семпли) | Done | `Sampler.run`, `ScopePanel` |
 | R-04 | Сітка бітів і тактів 4/4 залежно від BPM, прив'язка (snap) до бітів | Done | `ScopePanel` |
-| R-05 | Синтезатор: 8 клавіш C4-C5, пила + синус, проста огинаюча | Done | `Synth`, `Screen` |
+| R-05 | ~~Синтезатор: 8 клавіш C4-C5~~ | Removed | — |
 | R-06 | EQ: low shelf 100 Гц, peak 1 кГц, high shelf 8 кГц | Partial | `Eq`; параметри змінюються лише через AI |
 | R-07 | Компресор з авто-makeup | Partial | `Comp`; параметри лише через AI |
 | R-08 | Delay з нотною тривалістю 1/4, 1/8, 1/16 за BPM | Partial | `Delay.sync`; параметри лише через AI |

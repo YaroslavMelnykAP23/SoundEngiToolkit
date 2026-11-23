@@ -1,11 +1,9 @@
 package com.example.soundengitoolkit.audio
 
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.math.*
 
 const val SR = 44100f
-private const val TWO_PI = (2.0 * PI).toFloat()
 
 abstract class Fx {
     @Volatile var on = false
@@ -130,25 +128,6 @@ class Comp : Fx() {
             val over = 20f * log10(max(env, 1e-6f)) - thr
             val g = if (over > 0) 10f.pow(-(over * (1 - 1 / ratio)) / 20f) else 1f
             b[i] *= g * makeup
-        }
-    }
-}
-
-class Synth {
-    private class V(val f: Float) { var ph = 0f; var lv = 0f; var down = true }
-    private val voices = ConcurrentHashMap<Int, V>()
-
-    fun on(note: Int) { voices[note] = V(440f * 2f.pow((note - 69) / 12f)) }
-    fun off(note: Int) { voices[note]?.down = false }
-
-    fun run(b: FloatArray, n: Int) {
-        for ((k, v) in voices) {
-            for (i in 0 until n) {
-                v.lv = if (v.down) min(1f, v.lv + 0.005f) else v.lv - 0.0002f
-                if (v.lv <= 0f) { voices.remove(k); break }
-                v.ph += v.f / SR; if (v.ph >= 1f) v.ph -= 1f
-                b[i] += ((2 * v.ph - 1) * 0.15f + sin(TWO_PI * v.ph) * 0.15f) * v.lv
-            }
         }
     }
 }

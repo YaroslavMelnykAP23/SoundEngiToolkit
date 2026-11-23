@@ -9,7 +9,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateCentroid
@@ -171,16 +170,6 @@ fun Screen(e: Engine, ai: AiCommandViewModel) {
                     },
                     onDismiss = { showSave = false }
                 )
-
-                // Synth keys C4..C5
-                Row(Modifier.fillMaxWidth().height(90.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                    listOf(60, 62, 64, 65, 67, 69, 71, 72).forEach { note ->
-                        Box(Modifier.weight(1f).fillMaxHeight().background(Color(0xFFEEEEEE))
-                            .pointerInput(note) {
-                                detectTapGestures(onPress = { e.synth.on(note); tryAwaitRelease(); e.synth.off(note) })
-                            })
-                    }
-                }
 
                 // Effects
                 Text("BPM ${bpm.toInt()}")

@@ -44,12 +44,10 @@ flowchart TB
     end
 
     subgraph ENGINE["Engine.kt: audio thread"]
-        SYNTH["Synth<br/>Oscillator, ADSR"]
         SAMPLER["Sampler<br/>Mic recording"]
         FX["Effect chain<br/>EQ, Comp, Delay, Reverb"]
         VOL["Master volume (dB)"]
         OUT["AudioTrack to speaker"]
-        SYNTH --> FX
         SAMPLER --> FX
         FX --> VOL --> OUT
     end
@@ -101,7 +99,7 @@ flowchart TB
 |---|---|---|
 | UI | `MainActivity.kt` | `Screen` (головний екран з вкладками Studio / Library), `ScopePanel` (осцилограф, курсор, loop, сітка) |
 | Рушій | `audio/Engine.kt` | аудіопотоки, запис, ланцюжок ефектів, master volume, кільцевий буфер осцилографа |
-| DSP | `audio/Dsp.kt` | `Synth`, `Sampler`, `Eq`, `Comp`, `Delay`, `Reverb` |
+| DSP | `audio/Dsp.kt` | `Sampler`, `Eq`, `Comp`, `Delay`, `Reverb` |
 | AI-шар | `ai/domain/Ai.kt` | лише схема дій для моделі (`Ai.SYSTEM`) і тонка обгортка `Ai.apply` (використовується тестами) |
 | Use case | `ai/domain/RunAiCommandUseCase.kt` | сценарій «prompt → список дій»: валідація, виклик джерела, парсинг, повертає `Result<AiReply>`; не знає `Engine` |
 | ViewModel | `ai/ui/AiCommandViewModel.kt`, `ai/ui/AiUiState.kt` | стани Idle / Loading / Success / Error; `run` ігнорує повторні натискання під час Loading; `retry` повторює останній невдалий запит; дії до `Engine` застосовує колбек екрана (ViewModel не знає `Engine`) |

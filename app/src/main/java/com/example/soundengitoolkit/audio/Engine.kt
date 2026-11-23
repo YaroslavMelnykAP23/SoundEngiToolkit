@@ -6,7 +6,7 @@ import kotlin.concurrent.thread
 import kotlin.math.*
 
 class Engine {
-    val synth = Synth(); val sampler = Sampler()
+    val sampler = Sampler()
     val eq = Eq(); val comp = Comp(); val delay = Delay(); val reverb = Reverb()
     private val chain = listOf<Fx>(eq, comp, delay, reverb)
 
@@ -71,7 +71,7 @@ class Engine {
             track.play()
             while (running) {
                 buf.fill(0f)
-                synth.run(buf, buf.size); sampler.run(buf, buf.size)
+                sampler.run(buf, buf.size)
                 for (fx in chain) if (fx.on) fx.run(buf, buf.size)
                 val target = if (masterDb <= -60f) 0f else 10f.pow(masterDb / 20f)
                 for (i in buf.indices) { gainCur += (target - gainCur) * 0.002f; buf[i] *= gainCur }
