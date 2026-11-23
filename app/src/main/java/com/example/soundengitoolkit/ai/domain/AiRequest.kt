@@ -12,7 +12,7 @@ data class ChatTurn(val prompt: String, val result: String)
  */
 data class AiRequest(
     val prompt: String,
-    val state: FxState? = null,
+    val state: FxSnapshot? = null,
     val history: List<ChatTurn> = emptyList()
 ) {
     /** The user message sent to the cloud model: {"state":{...},"history":[...],"prompt":"..."}. */
@@ -34,7 +34,7 @@ object AiRequestBuilder {
     const val MAX_HISTORY = 3
 
     /** Throws [AiException] with [AiError.InvalidInput] for a blank or too long prompt. */
-    fun build(prompt: String, state: FxState? = null, history: List<ChatTurn> = emptyList()): AiRequest {
+    fun build(prompt: String, state: FxSnapshot? = null, history: List<ChatTurn> = emptyList()): AiRequest {
         val p = prompt.trim()
         if (p.isEmpty() || p.length > MAX_PROMPT) throw AiException(AiError.InvalidInput)
         return AiRequest(p, state, history.takeLast(MAX_HISTORY))

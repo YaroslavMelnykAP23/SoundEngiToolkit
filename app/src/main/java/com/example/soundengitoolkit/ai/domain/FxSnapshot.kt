@@ -7,7 +7,7 @@ import com.example.soundengitoolkit.audio.Engine
  * Snapshot of all parameters the AI may change. Pure data: used to give the model a reference point
  * for relative commands ("longer", "less") and, in step 2b, to compute what actually changed.
  */
-data class FxState(
+data class FxSnapshot(
     val bpm: Float,
     val delayOn: Boolean, val delayDivision: Int, val delayFeedback: Float, val delayMix: Float,
     val reverbOn: Boolean, val reverbMix: Float, val reverbSize: Float,
@@ -24,7 +24,7 @@ data class FxState(
         .put("eq", JSONObject().put("on", eqOn).put("low", eqLow.r()).put("mid", eqMid.r()).put("high", eqHigh.r()))
 
     companion object {
-        fun from(e: Engine) = FxState(
+        fun from(e: Engine) = FxSnapshot(
             bpm = e.bpm,
             delayOn = e.delay.on, delayDivision = e.delay.denom, delayFeedback = e.delay.fb, delayMix = e.delay.mix,
             reverbOn = e.reverb.on, reverbMix = e.reverb.mix, reverbSize = e.reverb.size,

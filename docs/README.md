@@ -11,6 +11,8 @@ Android-додаток (Kotlin, Jetpack Compose): семплер + синтез�
 | Як влаштований код і потоки | [architecture.md](architecture.md) |
 | Формат AI-команд і модель даних | [api-contract.md](api-contract.md) |
 | Як працює AI-частина | [ai-component.md](ai-component.md) |
+| AI-чат: специфікація, REQ, AC, план (Лаба 6) | [ai-chat.md](ai-chat.md) |
+| Оцінка AI «до/після», контрольні приклади | [evaluation.md](evaluation.md) |
 | Як перевіряти | [testing.md](testing.md) |
 | Що зламано чи ризиковано | [known-limitations.md](known-limitations.md) |
 | Чому зроблено саме так | [decisions.md](decisions.md) |
@@ -68,13 +70,50 @@ Firebase AI Logic).
 
 Windows: `gradlew` замість `./gradlew`.
 
+# Лабораторна робота 6: розвиток AI-функціональності
+
+**Варіант:** А, розширення наявної функції «AI-команда».
+
+**Що змінилось і навіщо.** Нова вкладка **AI** (чат): користувач описує бажаний звук, застосунок змінює параметри
+і відповідає, **що змінено** (було → стало, рахується на пристрої) і **навіщо** (пояснення моделі). Моделі передається
+поточний стан, тому працюють відносні команди («зроби delay довшим», «зменш reverb наполовину») і вимкнення
+(`reverb off`). Результат на 5 контрольних прикладах: намір 2/5 → 5/5, пояснень 0/5 → 5/5 ([evaluation.md](evaluation.md)).
+Попередній сценарій (поле AI command на Studio) збережено.
+
+**Модель і доступ:**
+
+| | |
+|---|---|
+| Джерело моделі | Gemini Developer API через Firebase AI Logic (`com.google.firebase:firebase-ai`, `firebase-bom 35.1.0`), виклик з клієнта, без власного backend |
+| Модель / параметри | `gemini-3.5-flash-lite`, `temperature 0.2`, `thinkingLevel LOW`, `responseSchema`; таймаут 20 с (`FirebaseSource`, `AiCall`) |
+| Тариф | Spark (безкоштовний); модель не потребує білінгу |
+| Потрібно | `app/google-services.json` (не комітиться), AI Logic → Gemini Developer API у консолі Firebase, App Check |
+| Без Firebase / мережі | прості команди (`120 bpm`, `reverb off`, `delay 1/8`) працюють офлайн правилами; складні дають помилку з Retry |
+
+**Запуск і перевірка:**
+
+1. Firebase Console → проєкт → Android-застосунок `com.example.soundengitoolkit` → завантажити `google-services.json` у `app/`.
+2. Firebase AI Logic → Get started → **Gemini Developer API**.
+3. App Check: запустити debug-збірку, скопіювати debug token з Logcat (тег `DebugAppCheckProvider`) →
+   App Check → Apps → Manage debug tokens → додати.
+4. `./gradlew assembleDebug` → Run на пристрої → вкладка **AI**.
+5. Тести (без мережі й ключів): `./gradlew testDebugUnitTest` — 133 тести.
+6. Ручні сценарії і контрольні приклади E1–E5: [evaluation.md](evaluation.md), розділ 5.
+7. Перед commit: `git diff` — без `google-services.json`, ключів і debug token.
+
+**Coding agent.** Код, тести й документацію писав AI-асистент (Claude) з доступом до репозиторію, покроково
+(крок → збірка → тести → commit). Мої перевірки: збірка і `testDebugUnitTest` після кожного кроку; ручні прогони на
+пристрої (офлайн, «high demand», таймаути, E1–E5 по 3 запуски); діагностика через Logcat, вибір моделі за результатами
+(3.8-flash → «high demand», 3.5-flash → таймаути, обрано 3.5-flash-lite). Знайдені на пристрої проблеми, які виправлялись:
+`eq on=true` без значень, неправильна категорія помилки офлайн, межове значення delay (L-30, записано як обмеження).
+
 ## Ключові факти
 
 | Параметр | Значення |
 |---|---|
 | Аудіо | mono, 44 100 Гц, `PCM_FLOAT`, блок 256 семплів |
-| Потоки | UI, `audio-out`, `audio-in`, корутина `Dispatchers.IO` для AI |
-| Пакети коду | корінь (`App`, `MainActivity`), `di`, `audio`, `data`, `ai.domain`, `ai.data`, `ai.ui`, `ui.library`, `ui.theme` (див. [architecture.md](architecture.md)) |
+| Потоки | UI, `audio-out`, `audio-in`, корутини `viewModelScope` для AI (команда і чат), `Dispatchers.IO` для БД |
+| Пакети коду | корінь (`App`, `MainActivity`), `di`, `audio`, `data`, `ai.domain`, `ai.data`, `ai.ui` (зокрема AI-чат), `ui.library`, `ui.theme` (див. [architecture.md](architecture.md)) |
 | Локальне сховище | Room (`soundengitoolkit.db`) + WAV у `filesDir/projects` |
 | Backend | немає; заплановано Firebase (Auth, Firestore, Storage) |
 | Автоматичні тести | JVM unit-тести без мережі й API key (`gradlew testDebugUnitTest`) |

@@ -9,7 +9,7 @@ import com.example.soundengitoolkit.ai.data.FakeCommandSource
 import com.example.soundengitoolkit.audio.Engine
 
 class RunAiChatUseCaseTest {
-    private val state = FxState.from(Engine())
+    private val state = FxSnapshot.from(Engine())
     private fun errorOf(r: Result<AiPlan>) = (r.exceptionOrNull() as AiException).error
 
     @Test fun success_planWithWhyAndReply() = runBlocking {

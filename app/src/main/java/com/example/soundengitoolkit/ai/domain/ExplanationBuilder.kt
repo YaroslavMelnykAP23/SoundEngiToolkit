@@ -21,7 +21,7 @@ sealed interface ChatAnswer {
 object ExplanationBuilder {
     const val HELP = "I can change BPM, delay, reverb, compressor and EQ. Try: \"reverb off\" or \"make it brighter\"."
 
-    fun build(actions: List<PlannedAction>, reply: String?, warnings: List<String>, before: FxState, after: FxState): ChatAnswer {
+    fun build(actions: List<PlannedAction>, reply: String?, warnings: List<String>, before: FxSnapshot, after: FxSnapshot): ChatAnswer {
         val changes = ChangeDiff.diff(before, after)
         val flatEq = after.eqOn && !before.eqOn && after.eqLow == 0f && after.eqMid == 0f && after.eqHigh == 0f
         val audible = changes.filterNot { flatEq && it.param == "EQ" }
@@ -73,7 +73,7 @@ object ExplanationBuilder {
         "bpm" -> "BPM"; "eq" -> "EQ"; else -> fx.replaceFirstChar { it.uppercase() }
     }
 
-    private fun defaultWhy(fx: String, s: FxState): String = when (fx) {
+    private fun defaultWhy(fx: String, s: FxSnapshot): String = when (fx) {
         "bpm" -> "Tempo sets the beat grid and the delay time."
         "delay" -> if (s.delayOn) "Delay repeats the sound in time with the tempo (1/${s.delayDivision} of a bar)." else "Without delay there are no echoes."
         "reverb" -> if (s.reverbOn) "Reverb adds a sense of space around the sound." else "Without reverb the sound is drier and closer."

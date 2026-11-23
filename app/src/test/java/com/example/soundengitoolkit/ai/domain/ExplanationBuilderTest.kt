@@ -9,9 +9,9 @@ import com.example.soundengitoolkit.audio.Engine
 class ExplanationBuilderTest {
     /** Apply on a real Engine exactly like the ViewModel will: before -> apply -> after -> answer. */
     private fun run(e: Engine, actions: List<PlannedAction>, reply: String? = null, warnings: List<String> = emptyList()): ChatAnswer {
-        val before = FxState.from(e)
+        val before = FxSnapshot.from(e)
         ActionExecutor.apply(e, actions.map { it.action })
-        return ExplanationBuilder.build(actions, reply, warnings, before, FxState.from(e))
+        return ExplanationBuilder.build(actions, reply, warnings, before, FxSnapshot.from(e))
     }
 
     // AC-3: the listed changes are exactly the real difference (warmer: only EQ, nothing else)

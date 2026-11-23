@@ -6,7 +6,7 @@
 |---|---|
 | Commit | `4415f10` (`4415f108052eee02f091ee063c4dceccfb09417b`), тег `lab6-baseline` |
 | Дата | 2026-11-23 |
-| Пристрій | <модель / емулятор, версія Android> |
+| Пристрій | емулятор Android Studio «Medium Phone», Android 17.0 |
 | Функція | «AI-команда»: текст → `HybridSource` (правила, потім хмара) → JSON-дії → `ActionExecutor` → лог |
 | Модель | `gemini-3.5-flash` (`FirebaseSource`, значення за замовчуванням), `responseMimeType = application/json`, без `responseSchema`, temperature за замовчуванням |
 | Залежності | `firebase-bom 35.1.0`, `firebase-ai`, `firebase-appcheck-debug` (debug), Kotlin 2.2.10, minSdk 29 |
@@ -74,3 +74,65 @@ AI command → Run, зробити скриншот логу та історії
 - Рішення: основна модель `gemini-3.5-flash-lite` (Stable, featured, без білінгу; задача коротка, важка модель не потрібна).
 - Тому в кроці 2a: таймаут 20 с, окремі категорії `Timeout` і `Busy` з Retry. Хмарні прогони для оцінки (Етап 5)
   повторюються, коли сервіс відповідає стабільно; час відповіді записується.
+
+## Етап 5. Нова версія: вкладка AI (чат)
+
+| Параметр | Значення |
+|---|---|
+| Commit | тег `lab6-final` (hash — у звіті: `git rev-parse --short lab6-final`) |
+| Модель | `gemini-3.5-flash-lite`, `temperature = 0.2`, `thinkingLevel = LOW`, `responseSchema` (`FirebaseSource`) |
+| Таймаут | 20 с (`AiCall.TIMEOUT_MS`) |
+| Дата прогону | 23.11.2026 |
+| Час відповіді | rules: миттєво; хмара (`gemini-3.5-flash-lite`): кілька секунд, у межах таймауту 20 с |
+
+### 5.1 Контрольні приклади «до / після»
+
+Хмарні приклади запускались по 3 рази, приклад зараховано, якщо намір виконано щонайменше у 2 з 3 (AC-1).
+Скриншоти: `img/lab6/after/` (`e2-chat.png`, `e1-chat.png`, `e2-run3-e3-boundary.png`, `e3-chat.png`, `e3-runs.png`, `e4-chat.png`, `e5-weather-chat.png`).
+
+| # | Вхід | До (baseline) | Після: запуски | Пояснення | Намір |
+|---|---|---|---|---|---|
+| E1 | `add delay 1/8 at 120 bpm and turn on compressor` | так (rules), пояснень немає | rules, миттєво. Delay 1/8 і BPM 120 вже були встановлені, тому Changed показав лише Compressor off → on (`e1-chat.png`) | так (стандартне для rules) | так |
+| E2 | `make sound warmer` | так з мережею (EQ low +4 high −4), пояснень немає | 1) EQ on з пласкими смугами → застосунок показав «EQ is on, but all bands are 0 dB…» (не ✓); 2) EQ low 0 → +4 dB, high 0 → −2 dB; 3) EQ low +4 → +7 dB, mid 0 → −2 dB (модель написала «reducing the highs», а змінила mid: Changed показав фактичне) | так (від моделі) | **2/3** |
+| E3 | `зроби delay довшим` (delay on, 1/8) | ні: rules, division 8 → 8, лог ✓ | від 1/8: 1) 1/8 → 1/4; 2) 1/8 → 1/4. Поза протоколом, від 1/4 (межа): двічі 1/4 → 1/8, тобто коротше, з текстом «зробив довшим» | так | **2/2** від 1/8; межа — обмеження L-30 |
+| E4 | `зменш reverb наполовину` (reverb on) | ні: reverb вмикався, mix не змінювався | 1) Reverb mix 100% → 50%; 2) 50% → 25%; 3) 25% → 13% | так | **3/3** |
+| E5 | `reverb off` (reverb on) | ні: лишався увімкненим, лог ✓ | rules: Reverb on → off; повторно: «Nothing changed: the settings already match the request» | так (стандартне) | так |
+
+E4 показує, що модель отримує поточний стан: кожен запуск ділить навпіл **поточне** значення (100 → 50 → 25 → 13).
+
+E2, запуск 3, показує, навіщо «що змінено» рахується на пристрої (REQ-7): текст моделі («reducing the highs»)
+не збігся з фактичною дією (mid −2 dB), і користувач побачив фактичну зміну, а не текст моделі.
+
+### 5.2 Критерії приймання
+
+| ID | Критерій | Baseline | Після | Як перевірено |
+|---|---|---|---|---|
+| AC-1 | Намір виконано (з мережею) | 2/5 | **5/5**; E3–E5: **3/3** | ручні прогони, 5.1 |
+| AC-2 | Кожна зміна має пояснення | 0/5 | 5/5 | скриншоти; `ExplanationBuilderTest.rules_withoutWhy_getDefaultExplanation` |
+| AC-3 | «Що змінено» = фактичний diff | — | так | `ExplanationBuilderTest.changes_equalRealDiff`, `unchangedParameters_areNotListed` |
+| AC-4 | E1, E5 офлайн правилами | 1/2 | 2/2 | `Lab6ExamplesTest`, `SimpleCommandParserTest` |
+| AC-5 | Немає значень поза діапазоном | ні | так (feedback 1.5 → 0.9 + ⚠) | `ActionClampTest`, `RunAiChatUseCaseTest.outOfRange_isClamped_withWarning` |
+| AC-6 | Порожній ввід / офлайн / налаштування / таймаут | частково | 4/4 | `AiChatViewModelTest`, `RunAiChatUseCaseTest`; скриншот офлайн |
+| AC-7 | Регресія Лаби 5 | — | так: 133 тести зелені, старий блок AI command працює | `BaselineAiTest`, `AiCommandViewModelTest`, ручний E1 у старому блоці |
+
+### 5.3 Обов'язкові перевірки
+
+| Сценарій | Результат |
+|---|---|
+| Попередній мобільний сценарій | старий блок AI command на Studio працює; регресійні тести зелені |
+| Некоректне / порожнє введення | Send неактивна; у ViewModel → `InvalidInput` без Retry (`AiChatViewModelTest.blank_isInvalidInput_notRetryable`); запит не про звук → пояснення моделі (скриншот «яка погода?») |
+| Немає мережі | «No connection. Simple commands still work offline…» + Retry; після вмикання мережі Retry працює (скриншот `e2-chat.png`) |
+| Помилка налаштування | `AiUnavailable`, без автоповторів (`AiChatViewModelTest.configError_isAiUnavailable_onlyManualRetry`) |
+| Повільна відповідь | таймаут 20 с → «AI did not answer in time» + Retry (`slowModel_isTimeout_notEndlessLoading`); реальний випадок «до»: очікування до 3 хв (розділ 1.3) |
+| `git diff` перед commit | `google-services.json`, ключів і debug token немає (файл у `.gitignore`) |
+
+### 5.4 Що не можна узагальнити за цим набором
+
+- **Межові значення (знайдено на E3):** коли delay уже 1/4 (найдовший), «зроби довшим» двічі дало 1/4 → 1/8 (коротше),
+  хоча текст моделі каже «довше». Модель не враховує, що далі подовжувати нікуди. Контрольний набір стартує з 1/8,
+  тому критерій це не ловить; потрібна перевірка напрямку на пристрої або окремий приклад на межу (L-30).
+- 5 прикладів і по 3 запуски на хмарний приклад — це не статистика: модель недетермінована (E2: 1 з перших 2 онлайн-запусків дав EQ без значень).
+- Baseline працював на `gemini-3.5-flash` (фактично 3.6-flash), нова версія — на `gemini-3.5-flash-lite`: частина різниці в E2 може бути від моделі, а не від змін.
+- Перевірено лише англійські й українські фрази одного автора; інші формулювання та мови не перевірялись.
+- Час відповіді виміряно в один вечір; навантаження на Gemini змінюється (розділ 1.3: «high demand», таймаути).
+- Чат пам'ятає 3 останні репліки і лише до закриття застосунку.

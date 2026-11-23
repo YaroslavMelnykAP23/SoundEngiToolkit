@@ -23,7 +23,7 @@ class AiRequestTest {
 
     @Test fun userMessage_containsOnlyStateHistoryAndPrompt() {
         val e = Engine(); e.reverb.on = true
-        val msg = JSONObject(AiRequest("less reverb", FxState.from(e), listOf(ChatTurn("reverb on", "reverb on"))).toUserMessage())
+        val msg = JSONObject(AiRequest("less reverb", FxSnapshot.from(e), listOf(ChatTurn("reverb on", "reverb on"))).toUserMessage())
         assertEquals(setOf("state", "history", "prompt"), msg.keys().asSequence().toSet())
         assertTrue(msg.getJSONObject("state").getJSONObject("reverb").getBoolean("on"))
         assertEquals(0.25, msg.getJSONObject("state").getJSONObject("reverb").getDouble("mix"), 1e-9)

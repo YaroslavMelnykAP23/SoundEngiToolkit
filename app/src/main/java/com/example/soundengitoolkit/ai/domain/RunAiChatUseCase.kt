@@ -19,7 +19,7 @@ class RunAiChatUseCase(
     private val source: CommandSource,
     private val timeoutMs: Long = AiCall.TIMEOUT_MS
 ) {
-    suspend operator fun invoke(prompt: String, state: FxState, history: List<ChatTurn>): Result<AiPlan> {
+    suspend operator fun invoke(prompt: String, state: FxSnapshot, history: List<ChatTurn>): Result<AiPlan> {
         val request = try {
             AiRequestBuilder.build(prompt, state, history)                 // [1]
         } catch (e: AiException) {

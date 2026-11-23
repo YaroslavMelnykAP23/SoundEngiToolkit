@@ -109,7 +109,7 @@ compressor, EQ) і відповідає повідомленням: **що зм�
    │  текст запиту
    ▼
 AiChatViewModel ── стан: Loading (поле і Send вимкнені)
-   │  prompt + FxState.from(engine) + 3 останні репліки
+   │  prompt + FxSnapshot.from(engine) + 3 останні репліки
    ▼
 [1] ПІДГОТОВКА ДАНИХ           AiRequestBuilder
    │  порожній → InvalidInput; trim; ≤ 500 символів; history.takeLast(3)
@@ -124,9 +124,9 @@ AiChatViewModel ── стан: Loading (поле і Send вимкнені)
    │  ActionClamp:    значення → діапазони, список попереджень
    ▼  AiPlan(actions, reply, warnings, source)
 AiChatViewModel (main thread)
-   │  before = FxState.from(engine)
+   │  before = FxSnapshot.from(engine)
    │  ActionExecutor.apply(engine, actions)      (L-04 виправлено)
-   │  after  = FxState.from(engine)
+   │  after  = FxSnapshot.from(engine)
    │  ChangeDiff(before, after) → List<Change(param, from, to)>
    │  ExplanationBuilder(changes, why, warnings, reply) → ChatMessage
    ▼
@@ -142,12 +142,12 @@ Firebase BoM **не змінюються**; нових залежностей н
 
 | Дія | Файл | Що |
 |---|---|---|
-| створити | `ai/domain/FxState.kt` | знімок параметрів рушія; `FxState.from(engine)` |
+| створити | `ai/domain/FxSnapshot.kt` | знімок параметрів рушія; `FxSnapshot.from(engine)` |
 | створити | `ai/domain/AiRequest.kt` | `AiRequest`, `ChatTurn`, `AiRequestBuilder` (підготовка даних) |
 | створити | `ai/domain/SimpleCommandParser.kt` | граматика простих команд, `off`/`вимкни`; `null`, якщо команда не проста |
 | створити | `ai/domain/AiReplyParser.kt` | JSON → `PlannedAction(action, why)` + `reply` (розширює `AiActionMapper`) |
 | створити | `ai/domain/ActionClamp.kt` | обрізання до діапазонів + попередження |
-| створити | `ai/domain/ChangeDiff.kt` | `Change(param, from, to)`, різниця двох `FxState` |
+| створити | `ai/domain/ChangeDiff.kt` | `Change(param, from, to)`, різниця двох `FxSnapshot` |
 | створити | `ai/domain/ExplanationBuilder.kt` | текст відповіді: зміни + «навіщо» + попередження / «нічого не змінено» |
 | створити | `ai/domain/RunAiChatUseCase.kt` | підготовка → джерело з таймаутом → парсинг → обрізання → `AiPlan` |
 | створити | `ai/ui/AiChatViewModel.kt`, `ai/ui/ChatUiState.kt` | повідомлення, стани, Retry |

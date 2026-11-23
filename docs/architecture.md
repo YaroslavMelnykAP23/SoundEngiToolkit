@@ -117,7 +117,7 @@ flowchart TB
 
 Backend: окремого сервера немає. Хмарні функції заплановані через Firebase (див. [decisions.md](decisions.md)).
 
-Інтерфейс має дві вкладки (`TabRow`): **Studio** (запис, осцилограф, клавіші, ефекти, AI-команди, кнопка Save) і **Library** (список збережених записів з Load і Delete). Після Load додаток повертається на Studio. Під час запису перехід на Library заблоковано.
+Інтерфейс має три вкладки (`TabRow`): **Studio** (запис, осцилограф, клавіші, ефекти, AI-команди, кнопка Save), **Library** (список збережених записів з Load і Delete) і **AI** (чат, Лаба 6: `AiChatScreen` з власним `LazyColumn`, тому рендериться поза прокручуваною колонкою Studio/Library). Після Load додаток повертається на Studio. Під час запису перехід на Library заблоковано.
 
 ## Рефакторинг сценарію «AI-команда» (лаб. 5): до і після
 
@@ -134,12 +134,42 @@ Backend: окремого сервера немає. Хмарні функції
 | Стани UI | немає: кнопку Run можна натискати повторно | `AiUiState` (Idle, Loading, Success, Error); Run неактивна під час запиту |
 | Повтор після помилки | ввести команду заново | кнопка Retry (розширення, лаб. 5) |
 
+## AI-чат (лаб. 6): компоненти і потік даних
+
+```
+AiChatScreen (вкладка AI) ── текст ──► AiChatViewModel ── loading: поле і Send вимкнені
+   │  prompt + FxSnapshot.from(engine) + 3 останні ChatTurn
+   ▼
+[1] ПІДГОТОВКА   AiRequestBuilder → AiRequest(prompt, state, history)
+[2] AI           AiCall (таймаут 20 с) → HybridSource
+                    ├─ SimpleCommandParser розібрав повністю → RulesSource (офлайн)
+                    └─ інакше → FirebaseSource → Gemini (responseSchema)
+[3] ПЕРЕТВОРЕННЯ AiReplyParser → ActionClamp → AiPlan
+   ▼
+AiChatViewModel (main): before = FxSnapshot → ActionExecutor.apply → after = FxSnapshot
+   → ExplanationBuilder (ChangeDiff) → ChatAnswer.Changed | NothingChanged → бульбашка в чаті
+   → ProjectStore.logAi (source = chat:rules | chat:cloud | chat:error)
+Помилка на будь-якому кроці → AiError → ChatMessage.Failure (+ Retry, крім InvalidInput)
+```
+
+| Шар | Класи | Тести |
+|---|---|---|
+| UI | `AiChatScreen`, `ChatUiState`, `ChatMessage` | ручні сценарії, скриншоти |
+| Presentation | `AiChatViewModel` | `AiChatViewModelTest` |
+| Domain: підготовка | `FxSnapshot`, `AiRequest`, `AiRequestBuilder` | `AiRequestTest` |
+| Domain: AI | `AiCall`, `CommandSource`, `SimpleCommandParser` | `RunAiChatUseCaseTest`, `SimpleCommandParserTest` |
+| Domain: перетворення | `AiReplyParser`, `ActionClamp`, `ChangeDiff`, `ExplanationBuilder`, `ActionExecutor` | `AiReplyParserTest`, `ActionClampTest`, `ExplanationBuilderTest` |
+| Data | `RulesSource`, `FirebaseSource`, `HybridSource`, `FakeCommandSource` | `Lab6ExamplesTest`, `BaselineAiTest` |
+
+`FxSnapshot` (знімок для AI) і `data.FxState` (серіалізація ефектів у Room) — різні класи.
+БД не змінювалась; фонових задач немає. Специфікація: [ai-chat.md](ai-chat.md).
+
 ## Потоки виконання
 
 1. **UI-потік (Compose)** малює екран і обробляє дотики.
 2. **`audio-out`** цикл по 256 семплів: обнулення буфера → синтезатор і семплер → ефекти (якщо ввімкнені) → master volume → обрізання до ±1 → запис у `scopeBuf` → `AudioTrack.write`.
 3. **`audio-in`** читає `AudioRecord`, збирає шматки в пам'ять; після зупинки нормалізує і передає в `Sampler.load`.
-4. **Корутина** (`viewModelScope` в `AiCommandViewModel`) виконує `RunAiCommandUseCase`, коли користувач натискає Run або Retry (мережевий виклик suspend і не блокує UI-потік), а також усі операції з файлами та базою (`ProjectStore`, `Dispatchers.IO`).
+4. **Корутина** (`viewModelScope` в `AiCommandViewModel` і `AiChatViewModel`) виконує `RunAiCommandUseCase` / `RunAiChatUseCase`, коли користувач натискає Run або Retry (мережевий виклик suspend і не блокує UI-потік), а також усі операції з файлами та базою (`ProjectStore`, `Dispatchers.IO`).
 
 Потоки обмінюються даними через поля `@Volatile` без блокувань. В аудіопотоці не можна виділяти пам'ять, блокуватися або викликати мережу.
 
@@ -149,11 +179,11 @@ Backend: окремого сервера немає. Хмарні функції
 
 **Осцилограф Live:** `audio-out` пише вихід у кільцевий буфер (8192 семпли) → `Engine.scope` вирівнює по переходу через нуль → UI малює лінію.
 
-**AI-команда:** текст → `AiCommandViewModel.run` (стан Loading, повторні Run ігноруються) → `RunAiCommandUseCase` (перевірка на порожній ввід) → `CommandSource` з `AppContainer` (`HybridSource`: правила, інакше Gemini; або `FakeCommandSource`) → `CommandReply(json, source)` → `AiActionMapper` → `List<AiAction>` → `AiReply`. ViewModel викликає колбек екрана, який запускає `ActionExecutor` (змінює поля ефектів) і синхронізує перемикачі; `audio-out` бачить нові значення на наступному блоці. Результат це `AiUiState.Success`. Будь-який збій перетворюється на `AiError` (без stack trace) і `AiUiState.Error`; для помилок, окрім `InvalidInput`, екран показує Retry, що повторює збережений запит. `CancellationException` пропускається далі.
+**AI-команда:** текст → `AiCommandViewModel.run` (стан Loading, повторні Run ігноруються) → `RunAiCommandUseCase` (перевірка на порожній ввід) → `AiCall` (таймаут 20 с) → `CommandSource` з `AppContainer` (`HybridSource`: прості команди правилами, інакше Gemini; помилки хмари не ховаються; або `FakeCommandSource`) → `CommandReply(json, source)` → `AiActionMapper` → `List<AiAction>` → `AiReply`. ViewModel викликає колбек екрана, який запускає `ActionExecutor` (змінює поля ефектів) і синхронізує перемикачі; `audio-out` бачить нові значення на наступному блоці. Результат це `AiUiState.Success`. Будь-який збій перетворюється на `AiError` (без stack trace) і `AiUiState.Error`; для помилок, окрім `InvalidInput`, екран показує Retry, що повторює збережений запит. `CancellationException` пропускається далі.
 
 **Збереження:** Save → `ProjectStore.save` (IO): `sampler.data` → WAV `filesDir/projects/<uuid>.wav` (спершу `.tmp`, потім перейменування) → запис у Room з BPM, курсором, маркерами та JSON ефектів. Load → читання WAV → `e.bpm`, `FxState.apply`, `sampler.load` → `ScopePanel` бачить новий масив і відновлює курсор та маркери зі `ViewState`. Зберігається сухий запис, а не результат з ефектами.
 
-**Історія AI:** після кожного Run `ProjectStore.logAi` пише запит, JSON, журнал і джерело (`rules`, `cloud`, `rules (cloud failed)`, `fake`, `error`) у Room; зберігається до 200 записів.
+**Історія AI:** після кожного Run `ProjectStore.logAi` пише запит, JSON, журнал і джерело (`rules`, `cloud`, `fake`, `error`; для чату `chat:rules`, `chat:cloud`, `chat:error`; до Лаби 6 також `rules (cloud failed)`) у Room; зберігається до 200 записів.
 
 Формат JSON: [ai-component.md](ai-component.md), [api-contract.md](api-contract.md).
 

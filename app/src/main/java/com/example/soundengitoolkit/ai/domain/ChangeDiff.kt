@@ -12,7 +12,7 @@ data class Change(val fx: String, val param: String, val from: String, val to: S
  * the message can never claim a change that did not happen, or hide one that did (AC-3).
  */
 object ChangeDiff {
-    fun diff(b: FxState, a: FxState): List<Change> {
+    fun diff(b: FxSnapshot, a: FxSnapshot): List<Change> {
         val out = mutableListOf<Change>()
         fun num(fx: String, name: String, x: Float, y: Float, fmt: (Float) -> String) {
             if (abs(x - y) > 1e-3f) out += Change(fx, name, fmt(x), fmt(y))

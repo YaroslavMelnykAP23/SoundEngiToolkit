@@ -40,6 +40,9 @@ import androidx.lifecycle.ViewModelProvider
 import kotlinx.coroutines.launch
 import com.example.soundengitoolkit.ai.domain.ActionExecutor
 import com.example.soundengitoolkit.ai.domain.AiAction
+import com.example.soundengitoolkit.ai.domain.FxSnapshot
+import com.example.soundengitoolkit.ai.ui.AiChatScreen
+import com.example.soundengitoolkit.ai.ui.AiChatViewModel
 import com.example.soundengitoolkit.ai.ui.AiCommandViewModel
 import com.example.soundengitoolkit.ai.ui.AiUiState
 import com.example.soundengitoolkit.audio.Engine
@@ -67,12 +70,25 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // AI chat (lab 6): same container and history store; the Engine is passed per call, not held by the ViewModel.
+    private val chatVm: AiChatViewModel by viewModels {
+        object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                val store = ProjectStore(applicationContext)
+                return AiChatViewModel((application as App).container.runAiChat) { p, j, l, s, ok ->
+                    store.logAi(p, j, l, s, ok)
+                } as T
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         engine.start()
         setContent {
             MaterialTheme(colorScheme = darkColorScheme()) {
-                Surface(color = Color(0xFF111111), contentColor = Color.White) { Screen(engine, aiVm) }
+                Surface(color = Color(0xFF111111), contentColor = Color.White) { Screen(engine, aiVm, chatVm) }
             }
         }
     }
@@ -81,7 +97,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun Screen(e: Engine, ai: AiCommandViewModel) {
+fun Screen(e: Engine, ai: AiCommandViewModel, chat: AiChatViewModel) {
     val scope = rememberCoroutineScope()
     var rec by remember { mutableStateOf(false) }
     var bpm by remember { mutableStateOf(120f) }
@@ -94,10 +110,11 @@ fun Screen(e: Engine, ai: AiCommandViewModel) {
     val projects by store.projects.collectAsState(initial = emptyList())
     val history by store.history.collectAsState(initial = emptyList())
     val aiState by ai.state.collectAsState()
+    val chatState by chat.state.collectAsState()
     val vs = remember { ViewState() }                       // cursor and loop markers, kept in sync by ScopePanel
     var restore by remember { mutableStateOf<ViewState?>(null) }
     var showSave by remember { mutableStateOf(false) }
-    var tab by rememberSaveable { mutableIntStateOf(0) }    // 0 = Studio, 1 = Library
+    var tab by rememberSaveable { mutableIntStateOf(0) }    // 0 = Studio, 1 = Library, 2 = AI chat
     val studioScroll = rememberScrollState()
     val libraryScroll = rememberScrollState()
 
@@ -118,6 +135,8 @@ fun Screen(e: Engine, ai: AiCommandViewModel) {
     }
 
     val applyActions: (List<AiAction>) -> String = { actions -> ActionExecutor.apply(e, actions).also { sync() } }
+    val readFx: () -> FxSnapshot = { FxSnapshot.from(e) }
+    val applyChat: (List<AiAction>) -> Unit = { actions -> ActionExecutor.apply(e, actions); sync() }
 
     Column(Modifier.fillMaxSize().background(Color(0xFF111111)).safeDrawingPadding()) {
         Text("SoundEngiToolkit", Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 8.dp),
@@ -127,9 +146,17 @@ fun Screen(e: Engine, ai: AiCommandViewModel) {
             Tab(selected = tab == 1,
                 onClick = { if (rec) status = "Stop recording first" else tab = 1 },
                 text = { Text("Library (${projects.size})") })
+            Tab(selected = tab == 2, onClick = { tab = 2 }, text = { Text("AI") })
         }
 
-        Column(Modifier.weight(1f).verticalScroll(if (tab == 0) studioScroll else libraryScroll).padding(16.dp),
+        // The chat has its own scrolling list, so it is not placed inside the scrolling column below.
+        if (tab == 2) AiChatScreen(
+            chatState,
+            onSend = { chat.send(it, readFx, applyChat) },
+            onRetry = { chat.retry(readFx, applyChat) },
+            modifier = Modifier.weight(1f)
+        )
+        else Column(Modifier.weight(1f).verticalScroll(if (tab == 0) studioScroll else libraryScroll).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (tab == 0) {
                 // Master volume: really changes what you hear (unlike the oscilloscope view gain)
