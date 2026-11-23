@@ -63,7 +63,7 @@ AI command → Run, зробити скриншот логу та історії
 | 18:06 | `gemini-3.5-flash` + `responseSchema` | ~1 хв | `RequestTimeoutException` |
 | 18:10 | `gemini-3.5-flash` без схеми | ~1 хв | `cloud`: `eq on=true low=4.0 high=-2.0` |
 | 18:15 | `gemini-3.5-flash` + `responseSchema` + `thinkingLevel = LOW` | ~3 хв | `RequestTimeoutException` |
-| 18:17 | **`gemini-3.5-flash-lite`** + `responseSchema` + `thinkingLevel = LOW` | кілька секунд | `cloud`: <дія з логу> |
+| 18:17 | **`gemini-3.5-flash-lite`** + `responseSchema` + `thinkingLevel = LOW` | кілька секунд | `cloud`: `eq on=true low=4.0` (лише низи; mid і high скинуто в 0 через L-04); скриншот `img/lab6/step1-lite.png` |
 
 Висновки:
 - Без власного таймауту користувач чекає до 3 хв (таймаут SDK) і бачить «No actions recognized»: підтверджено B-1 і B-12.
