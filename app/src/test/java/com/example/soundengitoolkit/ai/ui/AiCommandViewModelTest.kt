@@ -13,6 +13,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TestWatcher
 import org.junit.runner.Description
+import com.example.soundengitoolkit.ai.domain.AiRequest
 import com.example.soundengitoolkit.ai.domain.CommandReply
 import com.example.soundengitoolkit.ai.domain.CommandSource
 import com.example.soundengitoolkit.ai.data.FakeCommandSource
@@ -86,7 +87,7 @@ class AiCommandViewModelTest {
 
     @Test fun noActions_showsNotRecognized_andIsNotOk() {
         val empty = object : CommandSource {
-            override suspend fun ask(prompt: String) = CommandReply("""{"actions":[]}""", "stub")
+            override suspend fun ask(request: AiRequest) = CommandReply("""{"actions":[]}""", "stub")
         }
         val vm = vm(empty)
         vm.run("hello") { "" }

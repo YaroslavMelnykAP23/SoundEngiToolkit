@@ -5,12 +5,22 @@ import kotlinx.coroutines.CancellationException
 /** Successful result: typed actions, the raw JSON (for history) and which source answered. */
 data class AiReply(val actions: List<AiAction>, val json: String, val source: String)
 
-/** Scenario "AI command": validate -> ask source -> parse. No Android, no Engine, no UI. */
-class RunAiCommandUseCase(private val source: CommandSource) {
+/**
+ * Old scenario "AI command" (block on the Studio tab): validate -> ask source with timeout -> parse.
+ * Sends no state and no history (state = null): this block has no context, the AI chat does.
+ */
+class RunAiCommandUseCase(
+    private val source: CommandSource,
+    private val timeoutMs: Long = AiCall.TIMEOUT_MS
+) {
     suspend operator fun invoke(prompt: String): Result<AiReply> {
-        if (prompt.isBlank()) return Result.failure(AiException(AiError.InvalidInput))
+        val request = try {
+            AiRequestBuilder.build(prompt)
+        } catch (e: AiException) {
+            return Result.failure(e)
+        }
         return try {
-            val reply = source.ask(prompt.trim())
+            val reply = AiCall.ask(source, request, timeoutMs)
             Result.success(AiReply(AiActionMapper.parse(reply.json), reply.json, reply.source))
         } catch (e: CancellationException) {
             throw e

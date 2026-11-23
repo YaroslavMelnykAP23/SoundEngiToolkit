@@ -64,6 +64,8 @@ AI command → Run, зробити скриншот логу та історії
 | 18:10 | `gemini-3.5-flash` без схеми | ~1 хв | `cloud`: `eq on=true low=4.0 high=-2.0` |
 | 18:15 | `gemini-3.5-flash` + `responseSchema` + `thinkingLevel = LOW` | ~3 хв | `RequestTimeoutException` |
 | 18:17 | **`gemini-3.5-flash-lite`** + `responseSchema` + `thinkingLevel = LOW` | кілька секунд | `cloud`: `eq on=true low=4.0` (лише низи; mid і high скинуто в 0 через L-04); скриншот `img/lab6/step1-lite.png` |
+| 18:29 | `gemini-3.5-flash-lite`, крок 2a (старий блок, без стану) | кілька секунд | `cloud`: `eq on=true` **без значень** → смуги 0 dB, звук не змінився, але лог `✓`. Додано правило в `Ai.SYSTEM`: для зміни звучання завжди числові значення; приклад у промпті навмисно не з набору E1–E5 («brighter»), щоб не підганяти оцінку |
+| 18:31 | те саме + правило про числові значення в `Ai.SYSTEM`, 4 запуски | кілька секунд | 3/4: `eq on=true low=…` (з числами); 1/4: знову `eq on=true` без значень. Залишок закривається кроком 2b: `ChangeDiff` покаже «нічого не змінено» замість `✓` |
 
 Висновки:
 - Без власного таймауту користувач чекає до 3 хв (таймаут SDK) і бачить «No actions recognized»: підтверджено B-1 і B-12.

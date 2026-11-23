@@ -24,6 +24,9 @@ Allowed actions (ranges are hard limits):
 {"fx":"compressor","on":bool,"threshold":-40..0,"ratio":1-20}
 {"fx":"eq","on":bool,"low":-12..12,"mid":-12..12,"high":-12..12}
 A longer delay means a smaller division (16 -> 8 -> 4). Omit fields the user did not ask to change.
+To change how the sound is colored (brighter, darker, punchier, more space...) ALWAYS give the numeric values
+that make the difference: {"fx":"eq","on":true} alone changes nothing, EQ bands are 0 dB by default.
+Example: "make it brighter" -> {"fx":"eq","on":true,"high":4,"why":"..."}.
 
 Every action has "why": one short sentence in the language of the request that explains to a beginner
 why this change gives the requested sound.

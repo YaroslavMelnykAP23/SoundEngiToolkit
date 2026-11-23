@@ -9,6 +9,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.example.soundengitoolkit.ai.domain.AiRequest
 import com.example.soundengitoolkit.ai.domain.CommandReply
 import com.example.soundengitoolkit.ai.domain.CommandSource
 import com.example.soundengitoolkit.ai.data.HybridSource
@@ -18,14 +19,14 @@ import com.example.soundengitoolkit.audio.Engine
 
 class BaselineAiTest {
     private class Stub(private val reply: String? = null, private val error: Throwable? = null) : CommandSource {
-        override suspend fun ask(prompt: String): CommandReply {
+        override suspend fun ask(request: AiRequest): CommandReply {
             error?.let { throw it }
             return CommandReply(reply!!, "stub")
         }
     }
 
     private fun rules(p: String) =
-        JSONObject(runBlocking { RulesSource().ask(p) }.json).getJSONArray("actions")
+        JSONObject(runBlocking { RulesSource().ask(AiRequest(p)) }.json).getJSONArray("actions")
 
     // ---- RulesSource ----
 
@@ -83,27 +84,27 @@ class BaselineAiTest {
     }
     // ---- HybridSource ----
 
-    @Test fun hybrid_cloudFails_fallsBackToRules() = runBlocking {
+    // Deliberate change, lab 6 step 2a (was hybrid_cloudFails_fallsBackToRules): a cloud failure is no longer
+    // hidden behind an empty rules reply shown as success (L-25 / B-6); the error reaches the use case and the UI.
+    @Test fun hybrid_cloudFails_errorIsPropagated() {
         val h = HybridSource(RulesSource(), Stub(error = java.io.IOException("offline")))
-        val r = h.ask("make it warmer")
-        assertEquals(0, JSONObject(r.json).getJSONArray("actions").length())
-        assertEquals("rules (cloud failed)", r.source)
+        assertThrows(java.io.IOException::class.java) { runBlocking { h.ask(AiRequest("make it warmer")) } }
     }
 
     @Test fun hybrid_rulesRecognized_cloudNotNeeded() = runBlocking {
         val h = HybridSource(RulesSource(), Stub(error = IllegalStateException("must not be called")))
-        assertEquals("rules", h.ask("reverb").source)
+        assertEquals("rules", h.ask(AiRequest("reverb")).source)
     }
 
     @Test fun hybrid_cloudSucceeds_sourceIsCloud() = runBlocking {
         val h = HybridSource(RulesSource(), Stub(reply = """{"actions":[{"fx":"reverb","on":true}]}"""))
-        val r = h.ask("make it warmer")
+        val r = h.ask(AiRequest("make it warmer"))
         assertEquals("cloud", r.source)
         assertEquals(1, JSONObject(r.json).getJSONArray("actions").length())
     }
 
     @Test fun hybrid_cancellation_isNotSwallowed() {
         val h = HybridSource(RulesSource(), Stub(error = CancellationException("cancelled")))
-        assertThrows(CancellationException::class.java) { runBlocking { h.ask("make it warmer") } }
+        assertThrows(CancellationException::class.java) { runBlocking { h.ask(AiRequest("make it warmer")) } }
     }
 }

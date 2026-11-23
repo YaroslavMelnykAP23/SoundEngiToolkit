@@ -3,34 +3,26 @@ package com.example.soundengitoolkit.ai.data
 import com.google.firebase.Firebase
 import com.google.firebase.ai.ai
 import com.google.firebase.ai.type.GenerativeBackend
+import com.google.firebase.ai.type.RequestTimeoutException
 import com.google.firebase.ai.type.Schema
+import com.google.firebase.ai.type.ServerException
 import com.google.firebase.ai.type.ThinkingLevel
 import com.google.firebase.ai.type.content
 import com.google.firebase.ai.type.generationConfig
 import com.google.firebase.ai.type.thinkingConfig
 import kotlinx.coroutines.CancellationException
-import org.json.JSONArray
 import org.json.JSONObject
 import com.example.soundengitoolkit.ai.domain.AiError
 import com.example.soundengitoolkit.ai.domain.AiException
+import com.example.soundengitoolkit.ai.domain.AiRequest
 import com.example.soundengitoolkit.ai.domain.CommandReply
 import com.example.soundengitoolkit.ai.domain.CommandSource
+import com.example.soundengitoolkit.ai.domain.SimpleCommandParser
 
-/** Offline, free, instant. Understands only a few fixed phrases. */
+/** Offline, free, instant. Answers only simple, unambiguous commands; otherwise returns no actions. */
 class RulesSource : CommandSource {
-    override suspend fun ask(prompt: String): CommandReply {
-        val a = JSONArray(); val s = prompt.lowercase()
-        Regex("(\\d+)\\s*bpm|bpm\\s*(\\d+)").find(s)?.let {
-            a.put(JSONObject().put("fx", "bpm").put("value", (it.groupValues[1] + it.groupValues[2]).toInt()))
-        }
-        if ("delay" in s || "ділей" in s || "дилей" in s) {
-            val d = Regex("1/(\\d+)").find(s)?.groupValues?.get(1)?.toInt() ?: 8
-            a.put(JSONObject().put("fx", "delay").put("on", true).put("division", d))
-        }
-        if ("compress" in s || "компрес" in s) a.put(JSONObject().put("fx", "compressor").put("on", true))
-        if ("reverb" in s || "ревер" in s) a.put(JSONObject().put("fx", "reverb").put("on", true))
-        return CommandReply(JSONObject().put("actions", a).toString(), "rules")
-    }
+    override suspend fun ask(request: AiRequest): CommandReply =
+        CommandReply(SimpleCommandParser.toJson(SimpleCommandParser.parse(request.prompt).orEmpty()), "rules")
 }
 
 /**
@@ -63,17 +55,32 @@ class FirebaseSource(
         )
     }
 
-    override suspend fun ask(prompt: String): CommandReply {
+    override suspend fun ask(request: AiRequest): CommandReply {
         val text = try {
-            model.generateContent(prompt).text
+            model.generateContent(request.toUserMessage()).text   // state + history + prompt as JSON
         } catch (e: CancellationException) {
             throw e
         } catch (e: java.io.IOException) {
             throw e                                        // mapped to Network by AiErrorMapper
+        } catch (e: RequestTimeoutException) {
+            throw AiException(AiError.Timeout, e)          // SDK's own timeout
+        } catch (e: ServerException) {
+            throw AiException(if (isBusy(e)) AiError.Busy else AiError.AiUnavailable, e)
         } catch (e: Exception) {
-            throw AiException(AiError.AiUnavailable, e)    // Firebase not configured, quota, model refused
+            // Offline, the SDK throws its own exception with an IOException (UnknownHost...) inside: that is Network.
+            if (e.hasIoCause()) throw AiException(AiError.Network, e)
+            throw AiException(AiError.AiUnavailable, e)    // Firebase not configured, App Check, quota, model refused
         } ?: throw AiException(AiError.AiUnavailable)      // empty reply
         return CommandReply(text.replace("```json", "").replace("```", "").trim(), "cloud")
+    }
+
+    private fun Throwable.hasIoCause(): Boolean =
+        generateSequence(cause) { it.cause }.take(10).any { it is java.io.IOException }
+
+    /** "This model is currently experiencing high demand" (seen 2026-11-23) and other temporary overloads. */
+    private fun isBusy(e: ServerException): Boolean {
+        val m = e.message.orEmpty().lowercase()
+        return "high demand" in m || "overloaded" in m || "503" in m || "unavailable" in m
     }
 
     companion object {
@@ -115,20 +122,14 @@ class FirebaseSource(
     }
 }
 
-/** Rules first (free, offline). If nothing recognized, fall back to the cloud model. Stateless. */
+/**
+ * Simple commands -> rules (offline, free); everything else -> cloud with state and history.
+ * Cloud errors are NOT hidden behind an empty rules reply any more (was L-25 / B-6): the caller sees them.
+ */
 class HybridSource(private val rules: CommandSource, private val cloud: CommandSource) : CommandSource {
-    override suspend fun ask(prompt: String): CommandReply {
-        val r = rules.ask(prompt)
+    override suspend fun ask(request: AiRequest): CommandReply {
+        val r = rules.ask(request)
         if (JSONObject(r.json).getJSONArray("actions").length() > 0) return r
-        return try {
-            cloud.ask(prompt).copy(source = "cloud")
-        } catch (e: CancellationException) {
-            throw e                                        // cancellation is not a cloud failure
-        } catch (e: Exception) {
-            // For diagnosing cloud failures, temporarily add here:
-            System.err.println("HybridSource: cloud failed: $e")   // TEMP lab6 diagnostics (shows in Logcat as System.err)
-            e.cause?.let { System.err.println("HybridSource: cause: $it") }
-            CommandReply(r.json, "rules (cloud failed)")
-        }
+        return cloud.ask(request).copy(source = "cloud")
     }
 }

@@ -24,6 +24,8 @@ class FakeCommandSourceTest {
 
     @Test fun networkError_isNetwork() = assertEquals(AiError.Network, errorOf(run(FakeCommandSource.Mode.NETWORK_ERROR)))
     @Test fun unavailable_isAiUnavailable() = assertEquals(AiError.AiUnavailable, errorOf(run(FakeCommandSource.Mode.UNAVAILABLE)))
+    @Test fun busy_isBusy() = assertEquals(AiError.Busy, errorOf(run(FakeCommandSource.Mode.BUSY)))
+    @Test fun noActions_isSuccessWithEmptyList() = assertEquals(0, run(FakeCommandSource.Mode.NO_ACTIONS).getOrThrow().actions.size)
     @Test fun invalidJson_isInvalidResponse() = assertEquals(AiError.InvalidResponse, errorOf(run(FakeCommandSource.Mode.INVALID_JSON)))
 
     @Test fun container_switchesImplementationWithoutTouchingCallers() = runBlocking {

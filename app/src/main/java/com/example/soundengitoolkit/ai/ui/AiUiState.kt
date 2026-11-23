@@ -18,6 +18,8 @@ sealed interface AiUiState {
 fun AiError.userMessage(): String = when (this) {
     AiError.InvalidInput -> "Enter a command first"
     AiError.Network -> "No connection. Check the network and try again"
+    AiError.Timeout -> "AI did not answer in time. Try again"
+    AiError.Busy -> "AI is busy right now. Try again in a minute"
     AiError.AiUnavailable -> "Cloud AI is unavailable. Offline commands still work"
     AiError.InvalidResponse -> "The AI reply could not be understood"
     AiError.Unknown -> "Something went wrong"

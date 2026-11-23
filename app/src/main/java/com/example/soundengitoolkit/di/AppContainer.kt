@@ -1,5 +1,6 @@
 package com.example.soundengitoolkit.di
 
+import com.example.soundengitoolkit.ai.domain.AiRequest
 import com.example.soundengitoolkit.ai.domain.CommandReply
 import com.example.soundengitoolkit.ai.domain.CommandSource
 import com.example.soundengitoolkit.ai.data.FakeCommandSource
@@ -20,8 +21,8 @@ class AppContainer(initialUseFake: Boolean = false) {
 
     /** Delegates to the currently selected implementation; callers never know which one it is. */
     val commandSource: CommandSource = object : CommandSource {
-        override suspend fun ask(prompt: String): CommandReply =
-            (if (this@AppContainer.useFake) fakeSource else realSource).ask(prompt)
+        override suspend fun ask(request: AiRequest): CommandReply =
+            (if (this@AppContainer.useFake) fakeSource else realSource).ask(request)
     }
 
     val runAiCommand = RunAiCommandUseCase(commandSource)
