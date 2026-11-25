@@ -21,6 +21,7 @@ import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.geometry.Offset
@@ -36,6 +37,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -87,6 +94,38 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun Glyph(symbol: String, description: String) =
     Text(symbol, Modifier.semantics { contentDescription = description }, style = MaterialTheme.typography.titleLarge)
+
+/**
+ * BPM typed as a number (40–240, the same range the AI may set). Applied as soon as the value is valid;
+ * an invalid value only gets a red outline (no helper text) and is reverted to the current tempo when the field loses focus.
+ * Follows outside changes (AI, Load) when the user is not typing.
+ */
+@Composable
+private fun BpmField(bpm: Float, onBpm: (Float) -> Unit) {
+    val range = 40..240
+    val current = bpm.roundToInt()
+    var text by remember { mutableStateOf(current.toString()) }
+    var focused by remember { mutableStateOf(false) }
+    val focus = LocalFocusManager.current
+    LaunchedEffect(current) { if (text.toIntOrNull() != current) text = current.toString() }
+    val valid = text.toIntOrNull()?.let { it in range } == true
+    OutlinedTextField(
+        value = text,
+        onValueChange = { t ->
+            text = t.filter { it.isDigit() }.take(3)
+            text.toIntOrNull()?.takeIf { it in range }?.let { onBpm(it.toFloat()) }
+        },
+        modifier = Modifier.width(160.dp).onFocusChanged { f ->
+            if (focused && !f.isFocused && !valid) text = current.toString()
+            focused = f.isFocused
+        },
+        label = { Text("BPM") },
+        singleLine = true,
+        isError = !valid,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+        keyboardActions = KeyboardActions(onDone = { focus.clearFocus() })
+    )
+}
 
 /** Tab positions in the TabRow, left to right. The selected index must match the position. */
 private const val TAB_STUDIO = 0
@@ -171,14 +210,14 @@ fun Screen(e: Engine, chat: AiChatViewModel) {
                         else if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO)
                             == PackageManager.PERMISSION_GRANTED) begin()
                         else perm.launch(Manifest.permission.RECORD_AUDIO)
-                    }) { Glyph(if (rec) "■" else "●", if (rec) "Stop recording" else "Record") }
+                    }, Modifier.weight(1f)) { Glyph(if (rec) "■" else "●", if (rec) "Stop recording" else "Record") }
                     Button(onClick = {
                         when {
                             rec -> status = "Stop recording first"
                             e.sampler.data.isEmpty() -> status = "Nothing to save: record something first"
                             else -> showSave = true
                         }
-                    }) { Glyph("💾", "Save") }
+                    }, Modifier.weight(1f)) { Glyph("💾", "Save") }
                 }) { restore = null }
                 if (status.isNotEmpty()) Text(status, style = MaterialTheme.typography.bodySmall)
 
@@ -195,8 +234,7 @@ fun Screen(e: Engine, chat: AiChatViewModel) {
                 )
 
                 // Effects
-                Text("BPM ${bpm.toInt()}")
-                Slider(bpm, { bpm = it; e.bpm = it }, valueRange = 60f..200f)
+                BpmField(bpm) { v -> bpm = v; e.bpm = v; e.delay.sync(v) }   // delay time follows the tempo
                 fxState.keys.toList().forEach { name ->
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(name)
@@ -259,7 +297,7 @@ private fun columns(d: FloatArray, start: Float, len: Float, w: Int): Cols {
 @Composable
 fun ScopePanel(
     e: Engine, bpm: Float, vs: ViewState, restore: ViewState?,
-    controls: @Composable RowScope.() -> Unit = {},     // extra buttons after Play / Stop (Record, Save)
+    controls: @Composable RowScope.() -> Unit = {},     // extra buttons after Play / Stop (Record, Save); use Modifier.weight(1f)
     onRestored: () -> Unit
 ) {
     val bpmU = rememberUpdatedState(bpm)
@@ -328,10 +366,11 @@ fun ScopePanel(
 
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         run {
-            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            // Play, Stop, then [controls] (Rec, Save): all buttons share the width equally (weight 1f each)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { e.sampler.play(cursor) }, enabled = data.isNotEmpty()) { Glyph("▶", "Play from cursor") }
-                Button(onClick = { e.sampler.stop() }) { Glyph("■", "Stop playback") }
+                Button(onClick = { e.sampler.play(cursor) }, Modifier.weight(1f), enabled = data.isNotEmpty()) { Glyph("▶", "Play from cursor") }
+                Button(onClick = { e.sampler.stop() }, Modifier.weight(1f)) { Glyph("■", "Stop playback") }
                 controls()
             }
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
@@ -361,6 +400,9 @@ fun ScopePanel(
 
         Canvas(
             Modifier.fillMaxWidth().height(200.dp).background(Color(0xFF0A1A0A))
+                // Loop markers sit at the screen edges: without this, dragging them triggers the system
+                // "back" edge swipe and the app closes. Android allows up to 200 dp per edge, the scope is 200 dp.
+                .systemGestureExclusion()
                 .onSizeChanged { wPx = it.width }
                 .pointerInput(data) {
                     if (data.isEmpty()) return@pointerInput
