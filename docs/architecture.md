@@ -4,75 +4,74 @@
 
 ## Схема
 
+Схема відповідає коду на момент Лаби 7: лише компоненти, які реально існують і працюють. Заплановані хмарні
+сервіси (Firebase Auth / Firestore / Storage) у коді відсутні, тому зі схеми прибрані (див. [decisions.md](decisions.md)).
+
 ```mermaid
 flowchart TB
-    UI["UI: MainActivity.kt<br/>Compose: keys, sliders, AI prompt"]
+    subgraph UIL["UI: MainActivity.kt (Compose, вкладки Studio / Library / AI)"]
+        STUDIO["Studio: Record, осцилограф,<br/>ефекти, BPM, Play / Loop, Save"]
+        LIB["Library: LibraryUi.kt<br/>Load, Delete, AI history"]
+        CHAT["AI: AiChatScreen<br/>поле, Send, Retry, бульбашки"]
+    end
 
     subgraph ROOT["Composition root"]
-        APP["App (Application)<br/>creates the container once"]
-        CONT["AppContainer<br/>chooses and wires implementations<br/>useFake: real or fake"]
+        APP["App (Application)<br/>AppCheckSetup: debug provider"]
+        CONT["AppContainer<br/>HybridSource або Fake (useFake)"]
         APP --> CONT
     end
 
-    subgraph AIL["AI scenario: no Android, no Engine"]
-        UC["RunAiCommandUseCase<br/>validate, ask, parse, map errors"]
-        MAP["AiActionMapper<br/>JSON to List of AiAction"]
-        ERR["AiErrorMapper<br/>exception to AiError"]
-        IFACE["CommandSource (interface)"]
-        UC --> MAP
+    VM["AiChatViewModel + ChatUiState<br/>loading, messages, canRetry"]
+
+    subgraph DOM["ai.domain: без Android і Firebase"]
+        UC["RunAiChatUseCase"]
+        REQ["AiRequestBuilder<br/>trim, 1..500, history ≤ 3"]
+        CALL["AiCall<br/>таймаут 20 с"]
+        PARSE["AiReplyParser + AiActionMapper<br/>JSON → дії + why"]
+        CLAMP["ActionClamp<br/>діапазони, попередження"]
+        ERR["AiErrorMapper → AiError"]
+        EXPL["ExplanationBuilder + ChangeDiff<br/>було → стало, навіщо"]
+        EXEC["ActionExecutor<br/>дії → сетери Engine"]
+        UC --> REQ
+        UC --> CALL
+        UC --> PARSE --> CLAMP
         UC --> ERR
-        UC --> IFACE
     end
 
-    subgraph IMPL["CommandSource implementations"]
+    subgraph SRC["ai.data: реалізації CommandSource"]
         HYB["HybridSource"]
-        RULES["RulesSource (offline)"]
-        FIREB["FirebaseSource<br/>Gemini via Firebase AI Logic"]
-        FAKE["FakeCommandSource<br/>success / error modes"]
-        HYB --> RULES
-        HYB --> FIREB
+        RULES["RulesSource<br/>SimpleCommandParser, офлайн"]
+        FIREB["FirebaseSource<br/>responseSchema, T=0.2"]
+        FAKE["FakeCommandSource<br/>лише тести / debug"]
+        HYB -->|проста команда| RULES
+        HYB -->|решта| FIREB
     end
 
-    VM["AiCommandViewModel + AiUiState<br/>Idle, Loading, Success, Error<br/>run, retry"]
-    EXEC["ActionExecutor<br/>List of AiAction to Engine setters"]
-    STORE["ProjectStore: Room + WAV<br/>projects, AI history"]
-
-    subgraph FB["Firebase (planned)"]
-        AUTH["Authentication"]
-        FS["Firestore<br/>projects, presets"]
-        ST["Cloud Storage<br/>samples, recordings"]
+    subgraph EXT["Зовнішній сервіс"]
+        GEM["Firebase AI Logic<br/>Gemini Developer API<br/>gemini-3.5-flash-lite"]
+        AC["Firebase App Check"]
     end
 
-    subgraph ENGINE["Engine.kt: audio thread"]
-        SAMPLER["Sampler<br/>Mic recording"]
-        FX["Effect chain<br/>EQ, Comp, Delay, Reverb"]
-        VOL["Master volume (dB)"]
-        OUT["AudioTrack to speaker"]
-        SAMPLER --> FX
-        FX --> VOL --> OUT
-    end
+    ENGINE["Engine.kt: audio-in / audio-out<br/>Sampler → EQ → Comp → Delay → Reverb → Volume"]
+    STORE["ProjectStore: Room + WAV<br/>projects (з effectsJson), ai_history"]
 
-    CONT -->|creates| UC
-    CONT -->|creates| HYB
-    CONT -->|creates| FAKE
-    IFACE -.->|implemented by| HYB
-    IFACE -.->|implemented by| FAKE
-    UI -->|ViewModel factory takes use case| CONT
-    UI -->|prompt, Retry| VM
-    VM -->|prompt| UC
-    UC -->|AiReply or AiError| VM
-    VM -->|AiUiState| UI
-    VM -->|actions via screen callback| EXEC
-    EXEC -->|params| ENGINE
-    UI -->|keys, switches, volume| ENGINE
-    UI -->|save, load, history| STORE
-    STORE -->|sample, effects| ENGINE
-    UI -.->|sign in| AUTH
-    UI -.->|save, load| FS
-    SAMPLER -.->|upload, download| ST
-
-    classDef planned stroke-dasharray: 4 3
-    class AUTH,FS,ST planned
+    CONT -->|створює| UC
+    CONT -->|створює| HYB
+    CHAT -->|текст, Retry| VM
+    VM -->|ChatUiState| CHAT
+    VM -->|prompt + FxSnapshot + 3 ChatTurn| UC
+    CALL --> HYB
+    FIREB -->|HTTPS| GEM
+    AC -.->|токен| GEM
+    UC -->|AiPlan або AiError| VM
+    VM -->|колбек applyChat| EXEC
+    EXEC --> ENGINE
+    VM --> EXPL
+    VM -->|logAi| STORE
+    STUDIO --> ENGINE
+    STUDIO -->|Save| STORE
+    LIB -->|Load| STORE
+    STORE -->|WAV, BPM, ефекти| ENGINE
 ```
 
 ## Структура пакетів
@@ -85,9 +84,10 @@ flowchart TB
 | `di` | `AppContainer.kt` | composition root |
 | `audio` | `Engine.kt`, `Dsp.kt`, `Wav.kt` | рушій, DSP, WAV |
 | `data` | `Db.kt`, `Store.kt` | Room і `ProjectStore` |
-| `ai.domain` | `AiAction.kt`, `AiError.kt`, `CommandSource.kt`, `AiActionMapper.kt`, `AiErrorMapper.kt`, `ActionExecutor.kt`, `RunAiCommandUseCase.kt`, `Ai.kt` | типи, інтерфейс джерела команд, парсинг, use case; без Android і Firebase |
+| `ai.domain` | `Ai.kt`, `AiAction.kt`, `AiError.kt`, `AiErrorMapper.kt`, `CommandSource.kt`, `AiRequest.kt`, `AiCall.kt`, `SimpleCommandParser.kt`, `AiActionMapper.kt`, `AiReplyParser.kt`, `ActionClamp.kt`, `ActionExecutor.kt`, `FxSnapshot.kt`, `ChangeDiff.kt`, `ExplanationBuilder.kt`, `RunAiChatUseCase.kt` | типи, підготовка запиту, таймаут, парсинг, обмеження діапазонів, пояснення, use case; без Android і Firebase |
 | `ai.data` | `CommandSources.kt`, `FakeCommandSource.kt` | реалізації `CommandSource` (Rules, Firebase, Hybrid, Fake) |
-| `ai.ui` | `AiCommandViewModel.kt`, `AiUiState.kt` | ViewModel і стани екрана |
+| `ai.ui` | `AiChatScreen.kt`, `AiChatViewModel.kt`, `ChatUiState.kt` | екран чату, ViewModel, стани і тексти помилок |
+| `di` (debug) | `app/src/debug/.../AppCheckSetup.kt` | debug-провайдер App Check; у release — порожня реалізація |
 | `ui.library` | `LibraryUi.kt` | діалог збереження, список записів, історія AI |
 | `ui.theme` | `Color.kt`, `Theme.kt`, `Type.kt` | тема Compose |
 
@@ -97,19 +97,19 @@ flowchart TB
 
 | Компонент | Файл | Роль |
 |---|---|---|
-| UI | `MainActivity.kt` | `Screen` (головний екран з вкладками Studio / Library), `ScopePanel` (осцилограф, курсор, loop, сітка) |
+| UI | `MainActivity.kt`, `ai/ui/AiChatScreen.kt` | `Screen` (вкладки Studio / Library / AI), `ScopePanel` (осцилограф, курсор, loop, сітка), `AiChatScreen` (чат) |
 | Рушій | `audio/Engine.kt` | аудіопотоки, запис, ланцюжок ефектів, master volume, кільцевий буфер осцилографа |
 | DSP | `audio/Dsp.kt` | `Sampler`, `Eq`, `Comp`, `Delay`, `Reverb` |
 | AI-шар | `ai/domain/Ai.kt` | лише схема дій для моделі (`Ai.SYSTEM`) і тонка обгортка `Ai.apply` (використовується тестами) |
-| Use case | `ai/domain/RunAiCommandUseCase.kt` | сценарій «prompt → список дій»: валідація, виклик джерела, парсинг, повертає `Result<AiReply>`; не знає `Engine` |
-| ViewModel | `ai/ui/AiCommandViewModel.kt`, `ai/ui/AiUiState.kt` | стани Idle / Loading / Success / Error; `run` ігнорує повторні натискання під час Loading; `retry` повторює останній невдалий запит; дії до `Engine` застосовує колбек екрана (ViewModel не знає `Engine`) |
-| Типи AI | `ai/domain/AiAction.kt`, `ai/domain/AiError.kt` | `AiAction` (типізована дія), `AiError` (категорії: InvalidInput, Network, AiUnavailable, InvalidResponse, Unknown), `AiException` |
+| Use case | `ai/domain/RunAiChatUseCase.kt` | підготовка (`AiRequestBuilder`) → джерело з таймаутом (`AiCall`, 20 с) → парсинг (`AiReplyParser`) → обмеження (`ActionClamp`); повертає `Result<AiPlan>`; не знає `Engine`. `RunAiCommandUseCase` прибрано разом зі старим полем AI command після Лаби 6 |
+| ViewModel | `ai/ui/AiChatViewModel.kt`, `ai/ui/ChatUiState.kt` | стани: початковий, Loading, Changed (успіх), NothingChanged (немає результату), Failure (помилка, Retry); `send` ігнорує натискання під час Loading; `retry` замінює бульбашку помилки; дії до `Engine` застосовує колбек екрана (ViewModel не знає `Engine`) |
+| Типи AI | `ai/domain/AiAction.kt`, `ai/domain/AiError.kt` | `AiAction` (типізована дія), `AiError` (категорії: InvalidInput, Network, Timeout, Busy, AiUnavailable, InvalidResponse, Unknown), `AiException` |
 | Парсинг | `ai/domain/AiActionMapper.kt` | JSON → `List<AiAction>`; чистий парсинг без доступу до `Engine` |
 | Виконання | `ai/domain/ActionExecutor.kt` | застосовує `List<AiAction>` до `Engine` тими ж сетерами, що й UI; формує лог |
 | Помилки | `ai/domain/AiErrorMapper.kt` | технічний виняток → `AiError`; `CancellationException` не ковтає |
 | Джерела команд | `ai/domain/CommandSource.kt`, `ai/data/CommandSources.kt` | інтерфейс `CommandSource` і `CommandReply(json, source)` у домені; реалізації `RulesSource`, `FirebaseSource`, `HybridSource` у `ai.data`; типи Firebase SDK не виходять за межі `FirebaseSource` |
 | Fake | `ai/data/FakeCommandSource.kt` | друга реалізація інтерфейсу з режимами SUCCESS, NETWORK_ERROR, UNAVAILABLE, INVALID_JSON; без мережі й ключів |
-| Composition root | `App.kt`, `di/AppContainer.kt` | `App` створює `AppContainer` один раз; контейнер єдине місце, де обираються реалізації (`useFake`) і збирається `RunAiCommandUseCase` |
+| Composition root | `App.kt`, `di/AppContainer.kt` | `App` встановлює App Check і створює `AppContainer` один раз; контейнер єдине місце, де обираються реалізації (`useFake`) і збирається `RunAiChatUseCase` |
 | Сховище | `data/Store.kt` | `ProjectStore` (збереження, завантаження, видалення, історія AI), `FxState` (ефекти в JSON), `ViewState` (курсор і маркери) |
 | База даних | `data/Db.kt` | Room: `ProjectEntity`, `AiEntryEntity`, `ProjectDao`, `AiDao`, `AppDb` |
 | WAV | `audio/Wav.kt` | запис WAV 16 біт stereo (L=R), читання mono і stereo |
@@ -164,12 +164,52 @@ AiChatViewModel (main): before = FxSnapshot → ActionExecutor.apply → after =
 `FxSnapshot` (знімок для AI) і `data.FxState` (серіалізація ефектів у Room) — різні класи.
 БД не змінювалась; фонових задач немає. Специфікація: [ai-chat.md](ai-chat.md).
 
+## Шлях даних основного сценарію (Лаба 7, за кодом)
+
+Простежено за кодом (commit `0009fbf`, ver 0.2.4) від натискання Send до подальшої дії користувача.
+
+| # | Крок | Файл / клас, функція | Перевірка і обробка помилок | Таймаут |
+|---|---|---|---|---|
+| 1 | Введення запиту | `AiChatScreen`: `OutlinedTextField` + Send | Send неактивна, якщо поле порожнє або йде запит | — |
+| 2 | Передача у ViewModel | `MainActivity.Screen` → `AiChatViewModel.send(text, readFx, applyChat)` | повторний виклик під час `loading` ігнорується; бульбашка запиту додається | — |
+| 3 | Підготовка даних | `RunAiChatUseCase.invoke` → `AiRequestBuilder.build`; стан `FxSnapshot.from(engine)`; історія `turns.takeLast(3)` | `trim`; порожній або довший за 500 символів → `AiError.InvalidInput` | — |
+| 4 | Маршрутизація | `AiCall.ask` → `HybridSource.ask` → `RulesSource` (`SimpleCommandParser`) | правила розібрали команду повністю → відповідь без хмари (`source = rules`) | 20 с на весь виклик (`withTimeoutOrNull`) → `Timeout` |
+| 5 | AI-компонент | `FirebaseSource.ask` → `generateContent(AiRequest.toUserMessage())`, модель `gemini-3.5-flash-lite`, `responseSchema`, `temperature 0.2`, `thinkingLevel LOW` | `IOException` → `Network`; `RequestTimeoutException` → `Timeout`; `ServerException` «high demand» → `Busy`, інша → `AiUnavailable`; виняток з IO-причиною → `Network`; порожня відповідь → `AiUnavailable`. Типи SDK не виходять з класу | 20 с (крок 4); власний таймаут SDK не задано |
+| 6 | Обробка відповіді | `AiReplyParser.parse` (`AiActionMapper`) → `ActionClamp.clamp` → `AiPlan` | невалідний JSON → `InvalidResponse`; невідома `fx` → `AiAction.Unknown`, пропускається; поза діапазоном → обрізання + попередження; усе розбирається **до** застосування | — |
+| 7 | Застосування | `AiChatViewModel.run` (main) → `before = FxSnapshot` → `applyChat` = `ActionExecutor.apply(engine)` + `sync()` → `after` | виняток → `AiError.Unknown` | — |
+| 8 | Пояснення | `ExplanationBuilder.build` + `ChangeDiff.diff(before, after)` | «що змінено» — з фактичного diff, не з тексту моделі; немає змін → `ChatAnswer.NothingChanged` | — |
+| 9 | Відображення | `ChatUiState` → `AiChatScreen`: `Answer` / `Failure` + Retry (`canRetry`) | `loading = false` у кожній гілці; тексти помилок — `AiError.chatMessage()`, без класів винятків | — |
+| 10 | Історія | `ProjectStore.logAi` → Room `ai_history` (≤ 200) | помилка БД не ламає чат (best-effort) | — |
+| 11 | Подальша дія | Studio: Play / Loop A-B → Save → `ProjectStore.save` (WAV + `FxState.toJson` у `effectsJson`); Library → Load → `ProjectStore.load` | порожній запис → «Nothing to save: record something first»; запис через `.tmp` + перейменування | — |
+
+### Конфігурація зовнішнього AI-сервісу
+
+| Що | Фактично в коді / проєкті |
+|---|---|
+| Сервіс | Firebase AI Logic, Gemini Developer API (`GenerativeBackend.googleAI()`), виклик з клієнта, власного backend немає |
+| Конфігурація | `app/google-services.json` — у `.gitignore`, у репозиторій не потрапляє; ключів у коді немає |
+| Ініціалізація | `FirebaseSource.model` — `lazy`: без `google-services.json` застосунок запускається, хмарний запит дає `AiUnavailable` |
+| App Check | `AppCheckSetup` лише в `src/debug` (debug provider); debug token кожного пристрою реєструється в консолі, без нього — `AiUnavailable` («Cloud AI is unavailable…»). У release провайдера немає → для демонстрації лише debug APK |
+| Тариф | Spark (безкоштовний), модель не потребує білінгу |
+| Таймаут | 20 с (`AiCall.TIMEOUT_MS`), автоматичних повторів немає, Retry вручну |
+| Мережа | `INTERNET` у маніфесті; HTTPS, Network Security Config не потрібен (локального backend немає) |
+
+### Слабкі місця, знайдені під час трасування
+
+| ID | Де | Що | Що робимо |
+|---|---|---|---|
+| W-1 | `AiChatViewModel.fail`, `FirebaseSource` | Оригінальний виняток не пишеться в Logcat ніде (`Log` у `main` не використовується): користувач бачить зрозумілий текст, але причину збою на демонстрації не видно | **Виправлено** (Лаба 7): `AiChatViewModel` отримує `logError`, `MainActivity` передає `Log.w("AiChat", …, cause)`; тест `failure_originalExceptionLogged_notShownToUser` |
+| W-2 | `AiRequestBuilder` + `AiError.userMessage` | Запит довший за 500 символів дає повідомлення «Enter a command first» — неправильне пояснення; поле введення довжину не обмежує | **Виправлено** (Лаба 7): поле обрізає введення до 500 символів і показує лічильник; текст `InvalidInput` — «Enter a command (up to 500 characters)» |
+| W-3 | `MainActivity` (`private val engine = Engine()`) | L-13 / L-23: поворот екрана створює новий `Engine` — скидаються запис і ефекти, а відповідь AI, що прийшла під час повороту, застосовується до зупиненого рушія. Чат (ViewModel) при цьому зберігається і показує зміни, яких уже немає | **Виправлено** (Лаба 7): орієнтація зафіксована `portrait` у `AndroidManifest.xml`; інші зміни конфігурації — обмеження L-13 |
+| W-4 | `MainActivity` (Save / Load / Delete) | Помилки показуються як `"Save failed: ${ex.message}"` — сирий текст винятку | **Виправлено** (Лаба 7): зрозумілі тексти, оригінал — `Log.w("Library", …)`; `CancellationException` не перехоплюється |
+| W-5 | `ChatUiState.canRetry` | `AiUnavailable` (налаштування, App Check) пропонує Retry, хоча повтор не допоможе, доки не виправлено конфігурацію | Залишити (ручний Retry без автоповторів, за специфікацією), описати в README |
+
 ## Потоки виконання
 
 1. **UI-потік (Compose)** малює екран і обробляє дотики.
 2. **`audio-out`** цикл по 256 семплів: обнулення буфера → синтезатор і семплер → ефекти (якщо ввімкнені) → master volume → обрізання до ±1 → запис у `scopeBuf` → `AudioTrack.write`.
 3. **`audio-in`** читає `AudioRecord`, збирає шматки в пам'ять; після зупинки нормалізує і передає в `Sampler.load`.
-4. **Корутина** (`viewModelScope` в `AiChatViewModel`) виконує `RunAiChatUseCase`, коли користувач натискає Run або Retry (мережевий виклик suspend і не блокує UI-потік), а також усі операції з файлами та базою (`ProjectStore`, `Dispatchers.IO`).
+4. **Корутина** (`viewModelScope` в `AiChatViewModel`) виконує `RunAiChatUseCase`, коли користувач натискає Send або Retry (мережевий виклик suspend і не блокує UI-потік), а також усі операції з файлами та базою (`ProjectStore`, `Dispatchers.IO`).
 
 Потоки обмінюються даними через поля `@Volatile` без блокувань. В аудіопотоці не можна виділяти пам'ять, блокуватися або викликати мережу.
 

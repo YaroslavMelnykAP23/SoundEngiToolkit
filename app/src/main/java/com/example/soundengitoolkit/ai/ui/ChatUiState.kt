@@ -30,7 +30,7 @@ data class ChatUiState(
 
 /** Category -> text for the user. No exception classes, no stack traces. */
 fun AiError.userMessage(): String = when (this) {
-    AiError.InvalidInput -> "Enter a command first"
+    AiError.InvalidInput -> "Enter a command (up to 500 characters)"
     AiError.Network -> "No connection. Check the network and try again"
     AiError.Timeout -> "AI did not answer in time. Try again"
     AiError.Busy -> "AI is busy right now. Try again in a minute"

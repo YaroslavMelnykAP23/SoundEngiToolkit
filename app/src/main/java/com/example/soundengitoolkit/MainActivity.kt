@@ -4,6 +4,7 @@ import android.Manifest
 import kotlin.math.*
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -17,6 +18,7 @@ import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.onSizeChanged
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.Canvas
@@ -70,7 +72,11 @@ class MainActivity : ComponentActivity() {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
                 val store = ProjectStore(applicationContext)
-                return AiChatViewModel((application as App).container.runAiChat) { p, j, l, s, ok ->
+                return AiChatViewModel(
+                    (application as App).container.runAiChat,
+                    logError = { msg, t -> Log.w("AiChat", msg, t) },
+                    logInfo = { msg -> Log.i("AiChat", msg) }
+                ) { p, j, l, s, ok ->
                     store.logAi(p, j, l, s, ok)
                 } as T
             }
@@ -227,7 +233,11 @@ fun Screen(e: Engine, chat: AiChatViewModel) {
                         showSave = false
                         scope.launch {
                             status = try { "Saved: ${store.save(e, name, vs).name}" }
-                            catch (ex: Exception) { "Save failed: ${ex.message}" }
+                            catch (ex: CancellationException) { throw ex }
+                            catch (ex: Exception) {
+                                Log.w("Library", "Save failed", ex)     // W-4: details only in the log
+                                "Could not save the recording. Check free space and try again"
+                            }
                         }
                     },
                     onDismiss = { showSave = false }
@@ -258,13 +268,21 @@ fun Screen(e: Engine, chat: AiChatViewModel) {
                                 store.load(p, e); sync()
                                 tab = TAB_STUDIO                                                 // show the loaded recording
                                 "Loaded: ${p.name}"
-                            } catch (ex: Exception) { restore = null; "Load failed: ${ex.message}" }
+                            } catch (ex: CancellationException) { throw ex
+                            } catch (ex: Exception) {
+                                Log.w("Library", "Load failed", ex)
+                                restore = null; "Could not open this recording: the file is missing or damaged"
+                            }
                         }
                     },
                     onDelete = { p ->
                         scope.launch {
                             status = try { store.delete(p); "Deleted: ${p.name}" }
-                            catch (ex: Exception) { "Delete failed: ${ex.message}" }
+                            catch (ex: CancellationException) { throw ex }
+                            catch (ex: Exception) {
+                                Log.w("Library", "Delete failed", ex)
+                                "Could not delete the recording. Try again"
+                            }
                         }
                     }
                 )

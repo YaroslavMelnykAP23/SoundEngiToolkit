@@ -56,7 +56,7 @@
 
 | Категорія (`AiError`) | Коли | Повідомлення | Retry |
 |---|---|---|---|
-| `InvalidInput` | порожній / задовгий запит | Enter a command first | ні |
+| `InvalidInput` | порожній / задовгий запит | Enter a command (up to 500 characters) | ні |
 | `Network` | немає мережі (зокрема `IOException` усередині винятку SDK) | No connection… прості команди працюють офлайн | так |
 | `Timeout` | > 20 с або таймаут SDK | AI did not answer in time | так |
 | `Busy` | `ServerException` «high demand» / 503 | AI is busy right now | так |

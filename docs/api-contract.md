@@ -4,7 +4,8 @@
 
 ## 1. Контракт AI-команд (реалізовано)
 
-Це межа між AI та додатком. Реалізація: `Ai.SYSTEM`, `Ai.apply`, `CommandSource.ask`.
+Це межа між AI та додатком: формат дій, спільний для правил і моделі. Реалізація: `Ai.SYSTEM`, `CommandSource.ask`, `AiActionMapper`, `ActionExecutor`.
+Старе поле AI command, для якого контракт створювався, прибрано після Лаби 6; зараз цей формат використовує AI-чат (розділ 1a).
 
 **Запит:** довільний текст користувача (рядок). Приклад: `add delay 1/8 at 120 bpm and turn on compressor`.
 
@@ -41,15 +42,13 @@
 
 Слайдер BPM в UI має діапазон 60-200, а AI може встановити значення в межах 40-240 (з промпту), тож значення поза слайдером можливе. Див. [known-limitations.md](known-limitations.md).
 
-**Помилки:**
+**Помилки** (стан коду на Лабу 7):
 
 | Ситуація | Поведінка |
 |---|---|
-| Нерозпізнана `fx` | у лог додається `? <fx>`, дія пропускається |
-| Некоректний JSON, відсутній `actions` | виняток; UI показує `Error: <клас>: <повідомлення>` |
-| Хмара недоступна або Firebase не налаштовано | `HybridSource` повертає результат правил (можливо, порожній) |
-
-Значення від AI поки не обмежуються діапазонами в коді.
+| Нерозпізнана `fx` | `AiAction.Unknown`, дія пропускається; якщо інших змін немає — «нічого не змінено» |
+| Некоректний JSON, відсутній `actions` | `AiError.InvalidResponse`, нічого не застосовується (розбір до застосування) |
+| Хмара недоступна, Firebase не налаштовано | помилка показується користувачу (`Network` / `AiUnavailable` / `Busy` / `Timeout`), результат правил її не приховує (L-25 виправлено в Лабі 6) |
 
 ## 1a. AI-чат: запит і відповідь (Лаба 6, реалізовано)
 
@@ -92,6 +91,25 @@
 Правила (`RulesSource`) повертають той самий формат без `why` і `reply`.
 Пропущені поля **зберігають поточні значення** (L-04 виправлено, Лаба 6); смуга EQ без `on` вмикає EQ.
 
+**Виклик і помилки** (`AiCall`, `FirebaseSource`, `AiErrorMapper`, `ChatUiState`):
+
+| Параметр | Значення |
+|---|---|
+| Транспорт | Firebase AI Logic SDK (`firebase-ai`), HTTPS; власного endpoint немає |
+| Захист | App Check (debug provider у debug-збірці); ключів у коді й APK немає |
+| Таймаут | 20 с на весь виклик, автоматичних повторів немає |
+| Обмеження запиту | `prompt` 1–500 символів після `trim`; `history` ≤ 3 |
+
+| `AiError` | Коли | Текст у чаті | Retry |
+|---|---|---|---|
+| `InvalidInput` | порожній або > 500 символів (UI цього не допускає) | «Enter a command (up to 500 characters)» | ні |
+| `Network` | немає з'єднання | «No connection. Simple commands still work offline…» | так |
+| `Timeout` | > 20 с | «AI did not answer in time. Try again» | так |
+| `Busy` | `ServerException` «high demand» / overloaded | «AI is busy right now. Try again in a minute» | так |
+| `AiUnavailable` | App Check, квота, модель, немає `google-services.json`, порожня відповідь | «Cloud AI is unavailable (setup or quota). Simple commands still work.» | так (вручну) |
+| `InvalidResponse` | відповідь не відповідає контракту | «The AI reply could not be understood» | так |
+| `Unknown` | інше, зокрема виняток під час застосування | «Something went wrong» | так |
+
 ## 2. Локальна модель даних (реалізовано)
 
 База `soundengitoolkit.db` (Room, версія 1, міграцій поки немає). Файли: `filesDir/projects/<uuid>.wav` (WAV PCM 16 біт, stereo (обидва канали однакові, бо джерело mono), 44 100 Гц; при читанні підтримуються і старі mono-файли, stereo зводиться в mono; імʼя файлу не залежить від назви проєкту).
@@ -110,7 +128,7 @@
 | `wavFile` | String | імʼя файлу в `filesDir/projects` |
 | `effectsJson` | String | налаштування ефектів, формат нижче |
 
-**`ai_history`:** `id`, `prompt`, `json` (відповідь джерела), `log` (журнал виконання), `source` (`rules`, `cloud`, `rules (cloud failed)`), `ok` (виконано без помилки й щось розпізнано), `createdAt`. Зберігається до 200 останніх записів.
+**`ai_history`:** `id`, `prompt`, `json` (відповідь джерела), `log` (журнал виконання), `source` (AI-чат: `chat:rules`, `chat:cloud`, `chat:error`; старі записи до Лаби 6: `rules`, `cloud`, `fake`, `error`, `rules (cloud failed)`), `ok` (виконано без помилки й щось розпізнано), `createdAt`. Зберігається до 200 останніх записів.
 
 **Формат `effectsJson`** (ключі збігаються з AI-діями):
 

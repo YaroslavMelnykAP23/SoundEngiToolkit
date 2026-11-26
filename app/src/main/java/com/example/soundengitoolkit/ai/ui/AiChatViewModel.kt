@@ -23,6 +23,10 @@ import com.example.soundengitoolkit.ai.domain.RunAiChatUseCase
  */
 class AiChatViewModel(
     private val runAiChat: RunAiChatUseCase,
+    /** W-1 (Lab 7): the original exception goes only to the log (Logcat in the app), never to the user. */
+    private val logError: (message: String, cause: Throwable?) -> Unit = { _, _ -> },
+    /** Lab 7, task 4: one Logcat line per request with source, result and time, for the control set table. */
+    private val logInfo: (message: String) -> Unit = { },
     private val logHistory: suspend (prompt: String, json: String, log: String, source: String, ok: Boolean) -> Unit =
         { _, _, _, _, _ -> }
 ) : ViewModel() {
@@ -51,11 +55,15 @@ class AiChatViewModel(
     private fun run(prompt: String, readState: () -> FxSnapshot, apply: (List<AiAction>) -> Unit) {
         _state.update { it.copy(loading = true) }
         viewModelScope.launch {
+            val t0 = System.nanoTime()
+            fun ms() = (System.nanoTime() - t0) / 1_000_000
             val result = runAiChat(prompt, readState(), turns.toList())
             val plan = result.getOrNull()
             if (plan == null) {
-                val error = (result.exceptionOrNull() as? AiException)?.error ?: AiError.Unknown
-                fail(prompt, error, "")
+                val ex = result.exceptionOrNull()
+                val error = (ex as? AiException)?.error ?: AiError.Unknown
+                logInfo("\"${prompt.trim()}\" -> error $error in ${ms()} ms")
+                fail(prompt, error, "", ex?.cause ?: ex)
                 return@launch
             }
             val answer = try {
@@ -65,10 +73,11 @@ class AiChatViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                fail(prompt, AiError.Unknown, plan.json)
+                fail(prompt, AiError.Unknown, plan.json, e)
                 return@launch
             }
             lastFailedPrompt = null
+            logInfo("\"${prompt.trim()}\" -> ${plan.source}, ${if (answer is ChatAnswer.Changed) "changed" else "nothing changed"} in ${ms()} ms: ${ExplanationBuilder.summary(answer)}")
             turns += ChatTurn(prompt.trim(), ExplanationBuilder.summary(answer))
             add(ChatMessage.Answer(nextId++, answer, plan.source))
             _state.update { it.copy(loading = false) }
@@ -76,7 +85,8 @@ class AiChatViewModel(
         }
     }
 
-    private suspend fun fail(prompt: String, error: AiError, json: String) {
+    private suspend fun fail(prompt: String, error: AiError, json: String, cause: Throwable?) {
+        logError("AI chat failed: $error", cause)
         val retryable = error != AiError.InvalidInput
         lastFailedPrompt = if (retryable) prompt else null
         add(ChatMessage.Failure(nextId++, error, error.chatMessage(), retryable))

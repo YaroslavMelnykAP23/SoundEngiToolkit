@@ -120,4 +120,18 @@ class AiChatViewModelTest {
         assertEquals("Reverb off→on", h[0].result)
         assertTrue(fake.lastRequest!!.state!!.reverbOn)                 // state after the first change
     }
+
+    // Lab 7, W-1: the original exception goes to the log; the user sees only the category text
+    @Test fun failure_originalExceptionLogged_notShownToUser() {
+        val logged = mutableListOf<Throwable?>()
+        val vm = AiChatViewModel(
+            RunAiChatUseCase(FakeCommandSource(FakeCommandSource.Mode.NETWORK_ERROR)),
+            logError = { _, t -> logged += t }
+        )
+        vm.send("add reverb", read, apply); advance()
+        val f = vm.state.value.messages.last() as ChatMessage.Failure
+        assertTrue(logged.single() is java.io.IOException)
+        assertFalse(f.message.contains("fake: offline"))
+        assertFalse(f.message.contains("Exception"))
+    }
 }

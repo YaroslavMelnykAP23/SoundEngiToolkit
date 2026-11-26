@@ -34,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.soundengitoolkit.ai.domain.AiRequestBuilder
 import com.example.soundengitoolkit.ai.domain.ChatAnswer
 
 private val UserBubble = Color(0xFF3A2F5C)
@@ -83,8 +84,11 @@ fun AiChatScreen(
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
-                text, { text = it }, Modifier.weight(1f),
-                enabled = !state.loading, placeholder = { Text("Ask AI, e.g. make it warmer") }, maxLines = 3
+                text, { text = it.take(AiRequestBuilder.MAX_PROMPT) }, Modifier.weight(1f),   // W-2: never > 500
+                enabled = !state.loading, placeholder = { Text("Ask AI, e.g. make it warmer") }, maxLines = 3,
+                supportingText = if (text.length > AiRequestBuilder.MAX_PROMPT - 100) {
+                    { Text("${text.length}/${AiRequestBuilder.MAX_PROMPT}") }
+                } else null
             )
             Button(
                 enabled = text.isNotBlank() && !state.loading,
