@@ -15,8 +15,8 @@ android {
         applicationId = "com.example.soundengitoolkit"
         minSdk = 29
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 3
+        versionName = "0.3.0"   // Lab 7 final (tag lab7-final), see docs/CHANGELOG.md
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
