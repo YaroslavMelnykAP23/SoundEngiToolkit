@@ -71,4 +71,29 @@ class ExplanationBuilderTest {
         val a = run(e, listOf(PlannedAction(AiAction.Bpm(90f))))
         assertEquals("BPM 120→90", ExplanationBuilder.summary(a))
     }
+
+    // Lab 7, BUG-01: explicit "eq on" (rules) is listed as a change, with an honest note about flat bands
+    @Test fun explicitEqOn_fromRules_isListed_withFlatBandsNote() {
+        val e = Engine()
+        val actions = listOf(PlannedAction(AiAction.EqFx(true, null, null, null)))
+        val before = FxSnapshot.from(e)
+        ActionExecutor.apply(e, actions.map { it.action })
+        val a = ExplanationBuilder.build(actions, null, emptyList(), before, FxSnapshot.from(e), explicitCommand = true)
+        a as ChatAnswer.Changed
+        assertEquals(listOf("EQ"), a.changes.map { it.param })
+        assertEquals("off", a.changes[0].from); assertEquals("on", a.changes[0].to)
+        assertTrue(a.why["eq"]!!.contains("0 dB"))
+        assertFalse(a.why["eq"]!!.contains("Try again"))
+    }
+
+    // Lab 7, BUG-01: "вимкни компресор і увімкни eq" lists both parts of the command
+    @Test fun compressorOffAndEqOn_fromRules_listsBoth() {
+        val e = Engine(); e.comp.on = true
+        val actions = listOf(PlannedAction(AiAction.CompressorFx(false, null, null)), PlannedAction(AiAction.EqFx(true, null, null, null)))
+        val before = FxSnapshot.from(e)
+        ActionExecutor.apply(e, actions.map { it.action })
+        val a = ExplanationBuilder.build(actions, null, emptyList(), before, FxSnapshot.from(e), explicitCommand = true)
+        a as ChatAnswer.Changed
+        assertEquals(listOf("Compressor", "EQ"), a.changes.map { it.param })
+    }
 }

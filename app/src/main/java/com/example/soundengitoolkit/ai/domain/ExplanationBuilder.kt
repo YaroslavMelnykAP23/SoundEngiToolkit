@@ -21,10 +21,18 @@ sealed interface ChatAnswer {
 object ExplanationBuilder {
     const val HELP = "I can change BPM, delay, reverb, compressor and EQ. Try: \"reverb off\" or \"make it brighter\"."
 
-    fun build(actions: List<PlannedAction>, reply: String?, warnings: List<String>, before: FxSnapshot, after: FxSnapshot): ChatAnswer {
+    /**
+     * [explicitCommand] = the actions come from the rules, i.e. the user literally asked for them ("eq on").
+     * Then "EQ off -> on" with flat bands is what was asked and is listed as a change (Lab 7, BUG-01);
+     * from the model the same action means "warmer" was not done, so it is still reported as nothing changed.
+     */
+    fun build(
+        actions: List<PlannedAction>, reply: String?, warnings: List<String>, before: FxSnapshot, after: FxSnapshot,
+        explicitCommand: Boolean = false
+    ): ChatAnswer {
         val changes = ChangeDiff.diff(before, after)
         val flatEq = after.eqOn && !before.eqOn && after.eqLow == 0f && after.eqMid == 0f && after.eqHigh == 0f
-        val audible = changes.filterNot { flatEq && it.param == "EQ" }
+        val audible = changes.filterNot { flatEq && !explicitCommand && it.param == "EQ" }
 
         if (audible.isEmpty()) {
             val msg = when {
@@ -78,7 +86,12 @@ object ExplanationBuilder {
         "delay" -> if (s.delayOn) "Delay repeats the sound in time with the tempo (1/${s.delayDivision} of a bar)." else "Without delay there are no echoes."
         "reverb" -> if (s.reverbOn) "Reverb adds a sense of space around the sound." else "Without reverb the sound is drier and closer."
         "compressor" -> if (s.compOn) "The compressor evens out loud and quiet parts." else "Without compression the dynamics stay natural."
-        "eq" -> if (s.eqOn) "The EQ shapes the tone by boosting or cutting frequency bands." else "EQ off: the tone is not shaped."
+        "eq" -> when {
+            !s.eqOn -> "EQ off: the tone is not shaped."
+            s.eqLow == 0f && s.eqMid == 0f && s.eqHigh == 0f ->
+                "EQ is on, all bands are 0 dB: the tone changes once you adjust them, e.g. \"more bass\"."
+            else -> "The EQ shapes the tone by boosting or cutting frequency bands."
+        }
         else -> "Done as requested."
     }
 }

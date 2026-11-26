@@ -69,7 +69,8 @@ class AiChatViewModel(
             val answer = try {
                 val before = readState()                     // fresh: the user may have moved a switch while waiting
                 apply(plan.actions.map { it.action })
-                ExplanationBuilder.build(plan.actions, plan.reply, plan.warnings, before, readState())
+                ExplanationBuilder.build(plan.actions, plan.reply, plan.warnings, before, readState(),
+                    explicitCommand = plan.source == "rules")
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
