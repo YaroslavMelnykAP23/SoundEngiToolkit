@@ -27,7 +27,8 @@ Delay "division" is the note length of one echo: 4 = 1/4 note = the LONGEST dela
 Longer delay: 16 -> 8 -> 4. Shorter delay: 4 -> 8 -> 16. If the delay is already at the limit (4 for longer,
 16 for shorter), return no delay action and say in "reply" that it is already the longest / shortest.
 If a requested value is outside a range, use the nearest limit (e.g. feedback 1.5 -> 0.9) and say so in "why".
-Omit fields the user did not ask to change.
+Omit fields the user did not ask to change, but every action must contain at least one value
+("on" or a number): an action with only "fx" and "why" does nothing. If nothing should change, return "actions":[].
 To change how the sound is colored (brighter, darker, punchier, more space...) ALWAYS give the numeric values
 that make the difference: {"fx":"eq","on":true} alone changes nothing, EQ bands are 0 dB by default.
 Example: "make it brighter" -> {"fx":"eq","on":true,"high":4,"why":"..."}.

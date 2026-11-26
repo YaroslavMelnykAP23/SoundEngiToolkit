@@ -97,12 +97,19 @@ class ExplanationBuilderTest {
         assertEquals(listOf("Compressor", "EQ"), a.changes.map { it.param })
     }
 
-    // Lab 7, BUG-06: model action without values + a reply that claims a change -> honest message, reply not shown
-    @Test fun actionWithoutValues_isNoValues_andModelReplyHidden() {
+    // Lab 7, BUG-06 (seen on device: {"actions":[{"fx":"bpm","why":"..."}],"reply":"Темп встановлено на 240"}):
+    // the fact comes first, the model's text only as an attributed quote, never as "settings already match"
+    @Test fun actionWithoutValues_factFirst_modelReplyQuoted() {
         val a = run(Engine(), listOf(PlannedAction(AiAction.Bpm(null), "set to 240")), "Tempo set to 240 bpm.")
         a as ChatAnswer.NothingChanged
-        assertEquals(ExplanationBuilder.NO_VALUES, a.message)
-        assertFalse(a.message.contains("240"))
+        assertTrue(a.message.startsWith(ExplanationBuilder.NO_VALUES_SHORT))
+        assertTrue(a.message.contains("AI said: \"Tempo set to 240 bpm.\""))
+        assertFalse(a.message.contains("already match"))
+    }
+
+    @Test fun actionWithoutValues_noReply_suggestsRephrasing() {
+        val a = run(Engine(), listOf(PlannedAction(AiAction.DelayFx(null, null, null, null))))
+        assertEquals(ExplanationBuilder.NO_VALUES, (a as ChatAnswer.NothingChanged).message)
     }
 
     // A real no-op from the model (value equal to the current one) keeps the model's explanation, e.g. A-07
@@ -111,5 +118,23 @@ class ExplanationBuilderTest {
         val a = run(e, listOf(PlannedAction(AiAction.DelayFx(null, 4, null, null), "x")), "Delay is already at the maximum length.")
         a as ChatAnswer.NothingChanged
         assertTrue(a.message.contains("already at the maximum"))
+    }
+
+    // Lab 7, BUG-07 (FT-05): model action equal to the current state + a reply claiming a change -> no "already match"
+    @Test fun modelNoOp_withClaimingReply_factFirst_quoted() {
+        val e = Engine(); e.reverb.on = true
+        val a = run(e, listOf(PlannedAction(AiAction.ReverbFx(true, null, null), "x")), "Я додав реверберації.")
+        a as ChatAnswer.NothingChanged
+        assertTrue(a.message.startsWith(ExplanationBuilder.MATCHES_CURRENT))
+        assertTrue(a.message.contains("AI said: \"Я додав реверберації.\""))
+        assertFalse(a.message.contains("already match"))
+    }
+
+    // Rules no-op ("reverb off" when it is off) keeps the true "settings already match the request"
+    @Test fun rulesNoOp_saysAlreadyMatch() {
+        val actions = listOf(PlannedAction(AiAction.ReverbFx(false, null, null)))
+        val s = FxSnapshot.from(Engine())
+        val a = ExplanationBuilder.build(actions, null, emptyList(), s, s, explicitCommand = true)
+        assertEquals("Nothing changed: the settings already match the request.", (a as ChatAnswer.NothingChanged).message)
     }
 }

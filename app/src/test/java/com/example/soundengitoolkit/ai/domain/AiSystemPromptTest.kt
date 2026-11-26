@@ -31,4 +31,9 @@ class AiSystemPromptTest {
         listOf("make sound warmer", "300 bpm", "зроби delay довшим", "наполовину")
             .forEach { assertFalse("prompt contains control example: $it", p.contains(it, ignoreCase = true)) }
     }
+
+    // BUG-06: the model returned {"fx":"delay","why":...} / {"fx":"bpm","why":...} without values
+    @Test fun actionsMustHaveValues() {
+        assertTrue(p.contains("every action must contain at least one value"))
+    }
 }

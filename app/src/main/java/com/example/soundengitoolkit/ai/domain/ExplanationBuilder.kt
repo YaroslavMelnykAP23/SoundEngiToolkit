@@ -19,6 +19,8 @@ sealed interface ChatAnswer {
  * Rules give no "why": a short default explanation per effect is used instead, so every change is explained (AC-2).
  */
 object ExplanationBuilder {
+    const val MATCHES_CURRENT = "Nothing changed: the AI's actions match the current settings."
+    const val NO_VALUES_SHORT = "Nothing changed: the AI reply had no values that could be applied."
     const val NO_VALUES = "Nothing changed: the AI reply had no values that could be applied. Try rephrasing, e.g. \"120 bpm\"."
     const val HELP = "I can change BPM, delay, reverb, compressor and EQ. Try: \"reverb off\" or \"make it brighter\"."
 
@@ -39,11 +41,16 @@ object ExplanationBuilder {
             val msg = when {
                 actions.none { it.action !is AiAction.Unknown } -> reply ?: HELP
                 flatEq -> "EQ is on, but all bands are 0 dB, so the sound did not change. Try again or say e.g. \"more bass\"."
-                // Lab 7, BUG-06: the model returned actions without any value (e.g. {"fx":"bpm"}) and its text may claim
-                // a change that did not happen. Its text is not shown: it would contradict "Nothing changed".
+                // Lab 7, BUG-06: the model returned actions without any value (e.g. {"fx":"bpm"}). Its text may be true
+                // ("Delay is already at the maximum length") or claim a change that did not happen ("set to 240"),
+                // so the fact comes first and the model's text is shown only as a quoted, attributed note.
                 actions.filterNot { it.action is AiAction.Unknown }.all { it.action.hasNoValues() } ->
-                    NO_VALUES
-                else -> "Nothing changed: the settings already match the request." + (reply?.let { " $it" } ?: "")
+                    if (reply == null) NO_VALUES else "$NO_VALUES_SHORT AI said: \"$reply\""
+                // Rules: the user asked for exactly this, and it is already so -> the claim is true.
+                explicitCommand -> "Nothing changed: the settings already match the request."
+                // Lab 7, BUG-07: from the model the same claim may be false (FT-05: reverb with "value"/"threshold" fields
+                // that reverb does not have, reply "I added reverb"). Fact first, the model's text only as a quote.
+                else -> MATCHES_CURRENT + (reply?.let { " AI said: \"$it\"" } ?: "")
             }
             return ChatAnswer.NothingChanged(msg, warnings)
         }
