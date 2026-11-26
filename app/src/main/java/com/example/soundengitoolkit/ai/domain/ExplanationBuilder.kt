@@ -19,6 +19,7 @@ sealed interface ChatAnswer {
  * Rules give no "why": a short default explanation per effect is used instead, so every change is explained (AC-2).
  */
 object ExplanationBuilder {
+    const val NO_VALUES = "Nothing changed: the AI reply had no values that could be applied. Try rephrasing, e.g. \"120 bpm\"."
     const val HELP = "I can change BPM, delay, reverb, compressor and EQ. Try: \"reverb off\" or \"make it brighter\"."
 
     /**
@@ -38,6 +39,10 @@ object ExplanationBuilder {
             val msg = when {
                 actions.none { it.action !is AiAction.Unknown } -> reply ?: HELP
                 flatEq -> "EQ is on, but all bands are 0 dB, so the sound did not change. Try again or say e.g. \"more bass\"."
+                // Lab 7, BUG-06: the model returned actions without any value (e.g. {"fx":"bpm"}) and its text may claim
+                // a change that did not happen. Its text is not shown: it would contradict "Nothing changed".
+                actions.filterNot { it.action is AiAction.Unknown }.all { it.action.hasNoValues() } ->
+                    NO_VALUES
                 else -> "Nothing changed: the settings already match the request." + (reply?.let { " $it" } ?: "")
             }
             return ChatAnswer.NothingChanged(msg, warnings)
@@ -94,4 +99,14 @@ object ExplanationBuilder {
         }
         else -> "Done as requested."
     }
+}
+
+/** An action that sets nothing at all: applying it cannot change any parameter. */
+internal fun AiAction.hasNoValues(): Boolean = when (this) {
+    is AiAction.Bpm -> value == null
+    is AiAction.DelayFx -> on == null && division == null && feedback == null && mix == null
+    is AiAction.ReverbFx -> on == null && mix == null && size == null
+    is AiAction.CompressorFx -> on == null && threshold == null && ratio == null
+    is AiAction.EqFx -> on == null && low == null && mid == null && high == null
+    is AiAction.Unknown -> true
 }

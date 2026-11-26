@@ -78,7 +78,9 @@ class AiChatViewModel(
                 return@launch
             }
             lastFailedPrompt = null
-            logInfo("\"${prompt.trim()}\" -> ${plan.source}, ${if (answer is ChatAnswer.Changed) "changed" else "nothing changed"} in ${ms()} ms: ${ExplanationBuilder.summary(answer)}")
+            logInfo("\"${prompt.trim()}\" -> ${plan.source}, ${if (answer is ChatAnswer.Changed) "changed" else "nothing changed"} in ${ms()} ms: ${ExplanationBuilder.summary(answer)}" +
+                // Lab 7: for "nothing changed" from the model, the raw reply helps to see why (no secrets in it)
+                if (answer is ChatAnswer.NothingChanged && plan.source != "rules") " | json=${plan.json.take(400)}" else "")
             turns += ChatTurn(prompt.trim(), ExplanationBuilder.summary(answer))
             add(ChatMessage.Answer(nextId++, answer, plan.source))
             _state.update { it.copy(loading = false) }

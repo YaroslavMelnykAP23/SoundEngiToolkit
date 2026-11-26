@@ -57,4 +57,16 @@ class Lab7PreviousFunctionTest {
         val e = run("вимкни компресор і увімкни eq") { comp.on = true }
         assertFalse(e.comp.on); assertTrue(e.eq.on)
     }
+
+    // Lab 7, BUG-04 (A-08): out-of-range tempo -> rules, no cloud call, clamped to 240 with a warning
+    @Test fun a08_tempo300_rulesClampTo240_withWarning() = runBlocking {
+        val cloud = OfflineCloud()
+        val plan = com.example.soundengitoolkit.ai.domain.RunAiChatUseCase(HybridSource(RulesSource(), cloud))(
+            "set the tempo to 300 bpm", com.example.soundengitoolkit.ai.domain.FxSnapshot.from(Engine()), emptyList()
+        ).getOrThrow()
+        assertEquals("rules", plan.source)
+        assertEquals(0, cloud.calls)
+        assertEquals(com.example.soundengitoolkit.ai.domain.AiAction.Bpm(240f), plan.actions.single().action)
+        assertTrue(plan.warnings.single().contains("240"))
+    }
 }

@@ -96,4 +96,20 @@ class ExplanationBuilderTest {
         a as ChatAnswer.Changed
         assertEquals(listOf("Compressor", "EQ"), a.changes.map { it.param })
     }
+
+    // Lab 7, BUG-06: model action without values + a reply that claims a change -> honest message, reply not shown
+    @Test fun actionWithoutValues_isNoValues_andModelReplyHidden() {
+        val a = run(Engine(), listOf(PlannedAction(AiAction.Bpm(null), "set to 240")), "Tempo set to 240 bpm.")
+        a as ChatAnswer.NothingChanged
+        assertEquals(ExplanationBuilder.NO_VALUES, a.message)
+        assertFalse(a.message.contains("240"))
+    }
+
+    // A real no-op from the model (value equal to the current one) keeps the model's explanation, e.g. A-07
+    @Test fun realNoOp_keepsModelReply() {
+        val e = Engine(); e.delay.on = true; e.delay.denom = 4
+        val a = run(e, listOf(PlannedAction(AiAction.DelayFx(null, 4, null, null), "x")), "Delay is already at the maximum length.")
+        a as ChatAnswer.NothingChanged
+        assertTrue(a.message.contains("already at the maximum"))
+    }
 }

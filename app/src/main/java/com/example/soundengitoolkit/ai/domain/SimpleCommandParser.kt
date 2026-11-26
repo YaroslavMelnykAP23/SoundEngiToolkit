@@ -15,7 +15,7 @@ object SimpleCommandParser {
     private val FILLER = setOf("add", "set", "turn", "at", "the", "a", "to", "please", "with", "на", "з", "із", "до")
     private val ON = setOf("on", "enable", "увімкни", "ввімкни", "включи", "увімкнути", "додай")
     private val OFF = setOf("off", "disable", "вимкни", "виключи", "вимкнути", "прибери")
-    private val BPM_WORDS = setOf("bpm", "темп")
+    private val BPM_WORDS = setOf("bpm", "темп", "tempo")
     private val DIVISIONS = setOf(4, 8, 16)
     private val DIV = Regex("^1/(\\d+)$")
     private val NUM = Regex("^\\d+$")
@@ -81,7 +81,9 @@ object SimpleCommandParser {
                 else -> return null                                  // e.g. "довшим", "warmer", "наполовину"
             }
         }
-        if (number != null && (!bpmWord || number !in 40..240)) return null   // "reverb 50", "300 bpm" -> cloud
+        // "reverb 50" -> cloud. Lab 7 (BUG-04): a tempo outside 40..240 ("300 bpm") is still a simple command:
+        // the rules take it and ActionClamp limits it to the nearest bound with a warning (REQ-6), no model needed.
+        if (number != null && (!bpmWord || number !in 1..999)) return null
         if (number == null && bpmWord) return null                             // "bpm" without a value
         if (division != null && (fx != "delay" || on == false)) return null
         if (fx == null && (number == null || on != null)) return null         // "turn off" without an effect

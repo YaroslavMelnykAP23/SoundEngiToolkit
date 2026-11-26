@@ -23,14 +23,19 @@ Allowed actions (ranges are hard limits):
 {"fx":"reverb","on":bool,"mix":0-1,"size":0.5-0.95}
 {"fx":"compressor","on":bool,"threshold":-40..0,"ratio":1-20}
 {"fx":"eq","on":bool,"low":-12..12,"mid":-12..12,"high":-12..12}
-A longer delay means a smaller division (16 -> 8 -> 4). Omit fields the user did not ask to change.
+Delay "division" is the note length of one echo: 4 = 1/4 note = the LONGEST delay, 8 = 1/8, 16 = 1/16 = the SHORTEST.
+Longer delay: 16 -> 8 -> 4. Shorter delay: 4 -> 8 -> 16. If the delay is already at the limit (4 for longer,
+16 for shorter), return no delay action and say in "reply" that it is already the longest / shortest.
+If a requested value is outside a range, use the nearest limit (e.g. feedback 1.5 -> 0.9) and say so in "why".
+Omit fields the user did not ask to change.
 To change how the sound is colored (brighter, darker, punchier, more space...) ALWAYS give the numeric values
 that make the difference: {"fx":"eq","on":true} alone changes nothing, EQ bands are 0 dB by default.
 Example: "make it brighter" -> {"fx":"eq","on":true,"high":4,"why":"..."}.
 
-Every action has "why": one short sentence in the language of the request that explains to a beginner
-why this change gives the requested sound.
-"reply": one short sentence summary in the language of the request.
+Every action has "why": one short sentence that explains to a beginner why this change gives the requested sound.
+"reply": one short sentence summary.
+LANGUAGE: write "why" and "reply" in the same language as "prompt": Ukrainian prompt -> Ukrainian,
+English prompt -> English. Never answer in Russian or in a language the user did not use.
 If the request is not about these parameters or cannot be done, return "actions":[] and explain in "reply"
 what you can control, with an example command."""
 
